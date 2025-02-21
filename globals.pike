@@ -206,9 +206,9 @@ class http_websocket {
 	{
 		::create(name);
 		if (!ws_type) ws_type = name;
-		if (!(websocket_groups = G->G->websocket_groups[name]))
-			websocket_groups = G->G->websocket_groups[name] = ([]);
-		G->G->websocket_types[name] = this;
+		if (!(websocket_groups = G->G->websocket_groups[ws_type]))
+			websocket_groups = G->G->websocket_groups[ws_type] = ([]);
+		G->G->websocket_types[ws_type] = this;
 	}
 
 	mapping(string:mixed) render(Protocols.HTTP.Server.Request req, mapping replacements) {
