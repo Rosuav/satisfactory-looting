@@ -49,6 +49,11 @@ void retain(object module, string modname, string key) {
 	else module[key] = G->G[key];
 }
 
+@"G->G->inotify_hooks";
+void inotify_hook(object module, string modname, string key) {
+	G->G->inotify_hooks[modname] = module[key];
+}
+
 @"G->G->template_defaults";
 mapping(string:mixed)|string render_template(string template, mapping replacements)
 {
