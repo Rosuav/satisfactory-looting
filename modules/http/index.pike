@@ -20,6 +20,7 @@ mapping get_state(string|int group) {
 	//if you make a dedicated save as part of an existing session, it should be fine.
 	array sessions = ({ });
 	foreach (files, string fn) {
+		//TODO: Should these be excluded from the file list?
 		if (has_suffix(fn, "_autosave_0.sav") || has_suffix(fn, "_autosave_1.sav") || has_suffix(fn, "_autosave_2.sav")) {
 			string sess = fn[..<15];
 			if (!has_value(sessions, sess)) sessions += ({sess});
