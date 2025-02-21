@@ -116,8 +116,6 @@ mapping(string:mixed)|string render_template(string template, mapping replacemen
 		}
 	}
 	content = pieces * "";
-	if (!has_prefix(lower_case(content), "<!doctype"))
-		return render_template("default.html", replacements | (["content": content]));
 	return ([
 		"data": string_to_utf8(content),
 		"type": "text/html; charset=\"UTF-8\"",
@@ -217,7 +215,7 @@ class http_websocket {
 		if (replacements->vars->?ws_group) {
 			if (!replacements->vars->ws_type) replacements->vars->ws_type = ws_type;
 		}
-		return render_template(page_html, replacements);
+		return render_template("default.html", replacements);
 	}
 }
 
