@@ -8,8 +8,8 @@ mapping(string:mixed)|string|Concurrent.Future http_request(Protocols.HTTP.Serve
 }
 
 mapping get_state(string|int group) {
-	array files = glob("*.sav", get_dir(SAVEGAME_DIR));
-	array paths = (SAVEGAME_DIR + "/") + files[*];
+	array files = glob("*.sav", get_dir(SAVE_PATH));
+	array paths = (SAVE_PATH + "/") + files[*];
 	array mtimes = file_stat(paths[*])->?mtime;
 	sort(mtimes[*] * -1, files); //Sort by modification time descending, ie newest at the top
 	//HACK: Instead of reading every file to see what its session name is,

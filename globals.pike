@@ -7,7 +7,7 @@ protected void create(string n)
 }
 
 //TODO: Figure out a way to ask Steam where a game is installed, and what the active user is
-string SAVEGAME_DIR = "../.steam/steam/steamapps/compatdata/526870/pfx/drive_c/users/steamuser/Local Settings/Application Data/FactoryGame/Saved/SaveGames/76561198043731689";
+string SAVE_PATH = "../.steam/steam/steamapps/compatdata/526870/pfx/drive_c/users/steamuser/Local Settings/Application Data/FactoryGame/Saved/SaveGames/76561198043731689";
 
 //Handle potentially-asynchronous results. Can be used to paper over a distinction between
 //async and sync functions (forcing them all to be async).
