@@ -1,0 +1,1 @@
+../../stillebot/httpstatic/ws_sync.js
