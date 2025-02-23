@@ -46,6 +46,12 @@ constant ITEM_NAMES = ([
 	"BP_EquipmentDescriptorJumpingStilts_C": "Blade Runners",
 ]);
 
+string L10n(string id) {
+	if (ITEM_NAMES[id]) return ITEM_NAMES[id];
+	sscanf(id, "Desc_%s_C", id);
+	return String.trim(Regexp.SimpleRegexp("[A-Z][a-z]+")->replace(id) {return __ARGS__[0] + " ";});
+}
+
 //Handle potentially-asynchronous results. Can be used to paper over a distinction between
 //async and sync functions (forcing them all to be async).
 __async__ mixed spawn_task(mixed gen) {
