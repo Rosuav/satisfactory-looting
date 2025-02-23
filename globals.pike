@@ -8,6 +8,43 @@ protected void create(string n)
 
 //TODO: Figure out a way to ask Steam where a game is installed, and what the active user is
 string SAVE_PATH = "../.steam/steam/steamapps/compatdata/526870/pfx/drive_c/users/steamuser/Local Settings/Application Data/FactoryGame/Saved/SaveGames/76561198043731689";
+string CONFIG_FILE = "satisfactory-savefile.json";
+//If anything updates this, write it back. Manually.
+mapping persist = Standards.JSON.decode_utf8(Stdio.read_file(CONFIG_FILE) || "{}");
+
+//Can this be loaded from a localization file or something?
+constant ITEM_NAMES = ([
+	"Desc_AluminumPlateReinforced_C": "Heat Sink",
+	"Desc_AluminumPlate_C": "Alclad Aluminum Sheet",
+	"Desc_Biofuel_C": "Solid Biofuel",
+	"Desc_CartridgeSmart_C": "Rifle Smartridge",
+	"Desc_CartridgeStandard_C": "Rifle Ammo",
+	"Desc_Cement_C": "Concrete",
+	"Desc_ComputerSuper_C": "Supercomputer",
+	"Desc_Filter_C": "Gas Filter",
+	"Desc_Fuel_C": "Packaged Fuel",
+	"Desc_HighSpeedConnector_C": "High-Speed Connector",
+	"Desc_HighSpeedWire_C": "Quickwire",
+	"Desc_IronPlateReinforced_C": "Reinforced Iron Plate",
+	"Desc_IronScrew_C": "Screw",
+	"Desc_Medkit_C": "Medicinal Inhaler",
+	"Desc_ModularFrameFused_C": "Fused Modular Frame",
+	"Desc_ModularFrameHeavy_C": "Heavy Modular Frame",
+	"Desc_MotorLightweight_C": "Turbo Motor",
+	"Desc_NobeliskCluster_C": "Cluster Nobelisk",
+	"Desc_NobeliskExplosive_C": "Nobelisk",
+	"Desc_NobeliskGas_C": "Gas Nobelisk",
+	"Desc_NobeliskShockwave_C": "Pulse Nobelisk",
+	"Desc_PackagedBiofuel_C": "Packaged Liquid Biofuel",
+	"Desc_Rebar_Explosive_C": "Explosive Rebar",
+	"Desc_Rebar_Spreadshot_C": "Shatter Rebar",
+	"Desc_Rebar_Stunshot_C": "Stun Rebar",
+	"Desc_SpikedRebar_C": "Iron Rebar",
+	"Desc_SteelPlateReinforced_C": "Encased Industrial Beam",
+	"Desc_SteelPlate_C": "Steel Beam",
+	"Desc_TurboFuel_C": "Packaged Turbofuel",
+	"BP_EquipmentDescriptorJumpingStilts_C": "Blade Runners",
+]);
 
 //Handle potentially-asynchronous results. Can be used to paper over a distinction between
 //async and sync functions (forcing them all to be async).
