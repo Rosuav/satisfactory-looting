@@ -13,22 +13,13 @@ mapping get_state(string|int group) {
 	array paths = (SAVE_PATH + "/") + files[*];
 	array mtimes = file_stat(paths[*])->?mtime;
 	sort(mtimes[*] * -1, files); //Sort by modification time descending, ie newest at the top
-	//HACK: Instead of reading every file to see what its session name is,
-	//we assume two things: Firstly, every session will have at least one autosave in it;
-	//and secondly, all save files for a session (and no others) begin with that name.
-	//This means that a brand new session won't show up until its first autosave, but that
-	//if you make a dedicated save as part of an existing session, it should be fine.
-	array sessions = ({ });
-	foreach (files, string fn) {
-		//TODO: Should these be excluded from the file list?
-		if (has_suffix(fn, "_autosave_0.sav") || has_suffix(fn, "_autosave_1.sav") || has_suffix(fn, "_autosave_2.sav")) {
-			string sess = fn[..<15];
-			if (!has_value(sessions, sess)) sessions += ({sess});
-		}
-	}
+	//Sort sessions by the most recent save file in each one
+	mapping sessions = list_sessions();
+	array sess = indices(sessions);
+	sort(values(sessions)[*] * -1, sess);
 	return ([
 		"files": files,
-		"sessions": sessions,
+		"sessions": sess,
 	]);
 }
 
