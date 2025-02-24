@@ -17,7 +17,8 @@ string websocket_validate(mapping(string:mixed) conn, mapping(string:mixed) msg)
 }
 
 mapping get_state(string|int group) {
-	return cached_parse_savefile(group);
+	mapping savefile = cached_parse_savefile(group);
+	return savefile->mtime && savefile; //If the file doesn't exist, don't return any state at all, it's not useful.
 }
 
 @inotify_hook: void savefile_changed(string fn) {
