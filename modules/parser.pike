@@ -1,6 +1,6 @@
 inherit annotated;
 @retain: mapping(string:mapping(string:mixed)) parse_cache = ([]);
-constant CACHE_VALIDITY = 2; //Bump this number to invalidate older cache entries.
+constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entries.
 
 //Ensure that a file name is a valid save file. Can be used with completely untrusted names, and
 //will only return true if it is both safe and valid.
@@ -71,7 +71,6 @@ constant CACHE_VALIDITY = 2; //Bump this number to invalidate older cache entrie
 	[int sublevelcount] = data->sscanf("%-4c");
 	//write("Sublevels: %d\n", sublevelcount);
 	multiset seen = (<>);
-	ret->total_loot = ([]);
 	ret->crashsites = ({ }); ret->loot = ({ }); ret->visited_areas = ({ });
 	ret->spawners = ({ }); ret->mapmarkers = ({ }); ret->players = ({ });
 	while (sublevelcount-- > -1) {
@@ -254,7 +253,6 @@ constant CACHE_VALIDITY = 2; //Bump this number to invalidate older cache entrie
 			if (has_value(objects[i][1], "Pickup_Spawnable")) {
 				string id = (replace(prop["mPickupItems\0"][?"Item\0"] || "", "\0", "") / ".")[-1];
 				int num = prop["mPickupItems\0"][?"NumItems\0"];
-				ret->total_loot[id] += num;
 				ret->loot += ({({id, num, objects[i][9..11]})});
 				//write("Spawnable: (%.0f,%.0f,%.0f) %d of %s\n", objects[i][9], objects[i][10], objects[i][11], num, id);
 			}
@@ -319,6 +317,11 @@ constant CACHE_VALIDITY = 2; //Bump this number to invalidate older cache entrie
 		}
 	}
 	ret->haveloot = mkmapping(L10n(indices(haveloot)[*]), values(haveloot));
+	//Summarize total loot for convenience
+	ret->total_loot = ({ });
+	foreach (haveloot; string id; mapping locs)
+		ret->total_loot += ({({id, L10n(id), `+(@values(locs))})});
+	sort(ret->total_loot[*][0], ret->total_loot);
 
 	//------------- Do some translations and tidyups for convenience -------------//
 	array markers = ({ });
