@@ -1,4 +1,5 @@
 inherit http_websocket;
+inherit annotated;
 
 constant http_path_pattern = "/file/%[^/]";
 
@@ -17,6 +18,10 @@ string websocket_validate(mapping(string:mixed) conn, mapping(string:mixed) msg)
 
 mapping get_state(string|int group) {
 	return cached_parse_savefile(group);
+}
+
+@inotify_hook: void savefile_changed(string fn) {
+	send_updates_all(fn);
 }
 
 array(int) coords_to_pixels(array(float) pos) {
@@ -115,3 +120,5 @@ mapping websocket_cmd_findloot(mapping(string:mixed) conn, mapping(string:mixed)
 		"found": found,
 	]);
 }
+
+protected void create(string name) {::create(name);}

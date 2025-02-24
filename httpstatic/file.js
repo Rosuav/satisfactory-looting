@@ -36,14 +36,16 @@ export function render(state) {
 	set_content("#itemtype", [
 		OPTION({value: ""}, "Please select..."),
 		state.total_loot.map(([id, name, num]) => OPTION({value: id}, name + " (" + num + ")")),
-	]).value = refloc;
+	]).value = itemtype;
+	update_image();
 }
 
-on("change", "select", e => {
+on("change", "select", update_image);
+function update_image() {
 	const refloc = DOM("#refloc option:checked").ref_coords;
 	const itemtype = DOM("#itemtype").value;
 	if (refloc && itemtype) ws_sync.send({cmd: "findloot", refloc, itemtype});
-});
+}
 
 export function sockmsg_findloot(msg) {
 	set_content("#searchresults", [
