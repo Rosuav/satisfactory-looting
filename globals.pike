@@ -277,3 +277,19 @@ class trytls {
 		attach_fd(ssl, server_port, request_callback);
 	}
 }
+
+object get_satisfactory_map() {
+	string mapfile = "satisfactory-map.jpg";
+	if (!file_stat(mapfile)) {
+		//For annotations, we need the background map
+		werror("Downloading map...\n");
+		string raw = Protocols.HTTP.get_url_data(
+			"https://satisfactory.wiki.gg/images/e/ea/Map.jpg",
+			([]),
+			(["User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"]),
+		);
+		if (!raw) werror("Unable to download map\n"); //No explanation, whatevs.
+		else {Stdio.write_file(mapfile, raw); werror("Map downloaded and saved to %O.\n", mapfile);}
+	}
+	return Image.JPEG.decode(Stdio.read_file(mapfile));
+}

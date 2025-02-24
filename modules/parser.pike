@@ -1,6 +1,6 @@
 inherit annotated;
 @retain: mapping(string:mapping(string:mixed)) parse_cache = ([]);
-constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entries.
+constant CACHE_VALIDITY = 4; //Bump this number to invalidate older cache entries.
 
 //Ensure that a file name is a valid save file. Can be used with completely untrusted names, and
 //will only return true if it is both safe and valid.
@@ -288,7 +288,7 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 
 	//------------- Augment the loot list from the pristine file -------------//
 	//Which loot items do we already have?
-	mapping haveloot = ([]);
+	mapping haveloot = ret->haveloot = ([]);
 	foreach (ret->loot, [string item, int num, array(float) pos]) {
 		if (!haveloot[item]) haveloot[item] = ([]);
 		haveloot[item][sprintf("%d,%d,%d", @(array(int))pos)] = num;
@@ -316,7 +316,6 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 			thisloot[key] = num;
 		}
 	}
-	ret->haveloot = mkmapping(L10n(indices(haveloot)[*]), values(haveloot));
 	//Summarize total loot for convenience
 	ret->total_loot = ({ });
 	foreach (haveloot; string id; mapping locs)
