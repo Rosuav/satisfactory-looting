@@ -347,3 +347,102 @@ constant CACHE_VALIDITY = 4; //Bump this number to invalidate older cache entrie
 
 	return ret;
 }
+
+array(int) coords_to_pixels(array(float) pos) {
+	//To convert in-game coordinates to pixel positions:
+	//1) Rescale from 750000.0,750000.0 to 5000,5000 (TODO: Adjust if the map coords are wrong)
+	//2) Reposition since pixel coordinates have to use (0,0) at the corner
+	float x = (pos[0] + 324600.0) * 2 / 300;
+	float y = (pos[1] + 375000.0) * 2 / 300;
+	//Should we limit this to (0,0)-(5000,5000)?
+	return ({(int)x, (int)y});
+}
+
+void set_pixel_safe(Image.Image img, int x, int y, int r, int g, int b) {
+	if (x < 0 || y < 0 || x >= img->xsize() || y >= img->ysize()) return; //Out of bounds, ignore.
+	img->setpixel(x, y, r, g, b);
+}
+
+//reference can be eg crashsites or creaturespawns
+//Note that maxdist is measured diagonally as distance-squared.
+array(string|float) find_nearest(array reference, array(float) pos, float|void maxdist) {
+	string closest; float distance;
+	foreach (reference, array ref) {
+		float dist = `+(@((ref[1][*] - pos[*])[*] ** 2));
+		if (maxdist && dist > maxdist) continue;
+		if (!closest || dist < distance) {closest = ref[0]; distance = dist;}
+	}
+	return ({closest, distance});
+}
+
+void bounds_include(mapping savefile, int x, int y) {
+	if (!savefile->bounds) savefile->bounds = ({x, y, x, y});
+	if (savefile->bounds[0] > x) savefile->bounds[0] = x;
+	if (savefile->bounds[1] > y) savefile->bounds[1] = y;
+	if (savefile->bounds[2] < x) savefile->bounds[2] = x;
+	if (savefile->bounds[3] < y) savefile->bounds[3] = y;
+}
+
+void annotate_find_loot(mapping savefile, Image.Image annot_map, array(float) loc, string item) {
+	if (!savefile->haveloot[item]) return 0;
+	//The reference location is given as a blue star
+	[int basex, int basey] = coords_to_pixels(loc);
+	bounds_include(savefile, basex, basey);
+	for (int d = -10; d <= 10; ++d) {
+		set_pixel_safe(annot_map, basex + d, basey, 0, 0, 128); //Horizontal stroke
+		set_pixel_safe(annot_map, basex, basey + d, 0, 0, 128); //Vertical stroke
+		int diag = (int)(d * .7071); //Multiply by root two over two
+		set_pixel_safe(annot_map, basex + diag, basey + diag, 0, 0, 128); //Solidus
+		set_pixel_safe(annot_map, basex + diag, basey - diag, 0, 0, 128); //Reverse Solidus
+	}
+
+	//Alright. Now to list the (up to) three instances of that item nearest to the reference location.
+	//TODO: Check the quantities, and allow the user to request a certain number of the item
+	array distances = ({ }), details = ({ });
+	foreach (savefile->haveloot[item]; string pos; int num) {
+		sscanf(pos, "%f,%f,%f", float x, float y, float z);
+		float dist = (x - loc[0]) ** 2 + (y - loc[1]) ** 2 + (z - loc[2]) ** 2;
+		distances += ({dist});
+		details += ({({x, y, z, num})});
+	}
+	sort(distances, details);
+	array found = ({ });
+	foreach (details[..2]; int i; array details) {
+		savefile->found += ({sprintf("Found %d %s at %.0f,%.0f,%.0f - %.0f away\n",
+			details[3], L10n(item),
+			details[0], details[1], details[2],
+			(distances[i] ** 0.5) / 100.0)});
+		//Mark the location and draw a line to it
+		[int x, int y] = coords_to_pixels(details);
+		bounds_include(savefile, x, y);
+		annot_map->circle(x, y, 5, 5, 128, 192, 0);
+		annot_map->circle(x, y, 4, 4, 128, 192, 0);
+		annot_map->circle(x, y, 3, 3, 128, 192, 0);
+		annot_map->line(basex, basey, x, y, 32, 64, 0);
+	}
+}
+
+//TODO: Other map annotation types:
+// - all known crash sites
+// - loot, indicating (a) in file, (b) removed, (c) not yet added (using pristine file)
+// - all reference locations. Using this, the front end can potentially let you click to choose a loc.
+
+void annotate_autocrop(mapping savefile, Image.Image annot_map) {
+	int padding = 50;
+	savefile->annot_map = annot_map->copy(
+		max(savefile->bounds[0] - padding, 0),
+		max(savefile->bounds[1] - padding, 0),
+		min(savefile->bounds[2] + padding, annot_map->xsize()),
+		min(savefile->bounds[3] + padding, annot_map->ysize()),
+	);
+}
+
+@export: mapping(string:mixed) annotate_map(mapping|string savefile, array annots) {
+	if (stringp(savefile)) savefile = cached_parse_savefile(savefile) | ([]);
+	savefile->annot_map = get_satisfactory_map();
+	foreach (annots, array anno) {
+		function func = this["annotate_" + anno[0]];
+		func(savefile, savefile->annot_map, @anno[1..]);
+	}
+	return savefile;
+}
