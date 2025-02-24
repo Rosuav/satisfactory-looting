@@ -44,6 +44,8 @@ constant ITEM_NAMES = ([
 	"Desc_SteelPlate_C": "Steel Beam",
 	"Desc_TurboFuel_C": "Packaged Turbofuel",
 	"BP_EquipmentDescriptorJumpingStilts_C": "Blade Runners",
+	"BP_EquipmentDescriptorShockShank_C": "Xeno-Zapper",
+	"BP_EquipmentDescriptorStunSpear_C": "Xeno-Basher",
 ]);
 
 string L10n(string id) {
