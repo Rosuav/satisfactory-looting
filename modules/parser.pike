@@ -343,6 +343,8 @@ constant CACHE_VALIDITY = 1; //Bump this number to invalidate older cache entrie
 		])});
 	}
 	ret->mapmarkers = markers;
+	//TODO: Locate key structures such as the HUB and Skyscar, providing their coordinates.
+	//They can then be used like map markers in the front end.
 
 	return ret;
 }
