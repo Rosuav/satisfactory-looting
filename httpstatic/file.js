@@ -27,6 +27,7 @@ set_content("main", [
 let savefile_mtime;
 setInterval(() => {
 	const age = new Date/1000 - savefile_mtime;
+	console.log(age);
 	if (age < 0) set_content("#mtime", "File age: Unknown");
 	else if (age >= 86400*2) set_content("#mtime", ["File age: ", Math.floor(age / 86400), " days"]);
 	else if (age >= 86400) set_content("#mtime", "File age: Yesterday");
@@ -37,7 +38,7 @@ setInterval(() => {
 		"File age: ",
 		("0" + Math.floor(age / 60)).slice(-2),
 		":",
-		("0" + (age % 60)).slice(-2),
+		("0" + Math.floor(age % 60)).slice(-2),
 	]);
 }, 1000);
 		
