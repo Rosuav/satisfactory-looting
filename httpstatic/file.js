@@ -3,6 +3,7 @@ const {DIV, FIGURE, H1, H2, IMG, LABEL, LI, OPTGROUP, OPTION, P, SELECT, STYLE, 
 
 set_content("main", [
 	H1("Satisfactory Looting - " + ws_group),
+	P({id: "mtime"}),
 	H2("Search for:"),
 	P(LABEL([
 		"Reference location: ",
@@ -23,7 +24,25 @@ set_content("main", [
 	`),
 ]);
 
+let savefile_mtime;
+setInterval(() => {
+	const age = new Date/1000 - savefile_mtime;
+	if (age < 0) set_content("#mtime", "File age: Unknown");
+	else if (age >= 86400*2) set_content("#mtime", ["File age: ", Math.floor(age / 86400), " days"]);
+	else if (age >= 86400) set_content("#mtime", "File age: Yesterday");
+	else if (age >= 3600*2) set_content("#mtime", ["File age: ", Math.floor(age / 3600), " hours"]);
+	else if (age >= 3600) set_content("#mtime", "File age: An hour");
+	//The most interesting timestamps are the ones for active, current files. These are worth having the ticker for.
+	else set_content("#mtime", [
+		"File age: ",
+		("0" + Math.floor(age / 60)).slice(-2),
+		":",
+		("0" + (age % 60)).slice(-2),
+	]);
+}, 1000);
+		
 export function render(state) {
+	savefile_mtime = state.mtime;
 	const refloc = DOM("#refloc").value;
 	set_content("#refloc", [
 		OPTION({value: ""}, "Please select..."),
