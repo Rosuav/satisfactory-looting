@@ -20,6 +20,7 @@ mapping get_state(string|int group) {
 }
 
 @inotify_hook: void savefile_changed(string fn) {
+	if (!has_suffix(fn, ".sav")) return;
 	if (string sess = G->G->file_sessions[fn]) send_updates_all(sess);
 }
 
