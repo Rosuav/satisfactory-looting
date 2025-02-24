@@ -63,13 +63,13 @@ mapping websocket_cmd_findloot(mapping(string:mixed) conn, mapping(string:mixed)
 	object annot_map = get_satisfactory_map();
 
 	//The reference location is given as a blue star
-	[int x, int y] = coords_to_pixels(loc);
+	[int basex, int basey] = coords_to_pixels(loc);
 	for (int d = -10; d <= 10; ++d) {
-		set_pixel_safe(annot_map, x + d, y, 0, 0, 128); //Horizontal stroke
-		set_pixel_safe(annot_map, x, y + d, 0, 0, 128); //Vertical stroke
+		set_pixel_safe(annot_map, basex + d, basey, 0, 0, 128); //Horizontal stroke
+		set_pixel_safe(annot_map, basex, basey + d, 0, 0, 128); //Vertical stroke
 		int diag = (int)(d * .7071); //Multiply by root two over two
-		set_pixel_safe(annot_map, x + diag, y + diag, 0, 0, 128); //Solidus
-		set_pixel_safe(annot_map, x + diag, y - diag, 0, 0, 128); //Reverse Solidus
+		set_pixel_safe(annot_map, basex + diag, basey + diag, 0, 0, 128); //Solidus
+		set_pixel_safe(annot_map, basex + diag, basey - diag, 0, 0, 128); //Reverse Solidus
 	}
 
 	//Alright. Now to list the (up to) three instances of that item nearest to the reference location.
@@ -83,21 +83,31 @@ mapping websocket_cmd_findloot(mapping(string:mixed) conn, mapping(string:mixed)
 	}
 	sort(distances, details);
 	array found = ({ });
+	array bounds = ({basex, basey, basex, basey});
 	foreach (details[..2]; int i; array details) {
 		found += ({sprintf("Found %d %s at %.0f,%.0f,%.0f - %.0f away\n",
 			details[3], L10n(item),
 			details[0], details[1], details[2],
 			(distances[i] ** 0.5) / 100.0)});
 		//Mark the location and draw a line to it
-		[int basex, int basey] = coords_to_pixels(loc);
 		[int x, int y] = coords_to_pixels(details);
 		annot_map->circle(x, y, 5, 5, 128, 192, 0);
 		annot_map->circle(x, y, 4, 4, 128, 192, 0);
 		annot_map->circle(x, y, 3, 3, 128, 192, 0);
 		annot_map->line(basex, basey, x, y, 32, 64, 0);
+		if (bounds[0] > x) bounds[0] = x;
+		if (bounds[1] > y) bounds[1] = y;
+		if (bounds[2] < x) bounds[2] = x;
+		if (bounds[3] < y) bounds[3] = y;
 	}
 
-	//TODO: Optionally crop the image to a square containing the refloc and all (up to) three loot, with a 10px buffer around it
+	//TODO: Make this cropping optional
+	int padding = 50;
+	bounds[0] = max(bounds[0] - padding, 0);
+	bounds[1] = max(bounds[1] - padding, 0);
+	bounds[2] = min(bounds[2] + padding, annot_map->xsize());
+	bounds[3] = min(bounds[3] + padding, annot_map->ysize());
+	annot_map = annot_map->copy(@bounds);
 
 	return ([
 		"cmd": "findloot",
