@@ -1,5 +1,6 @@
 inherit annotated;
 @retain: mapping(string:mapping(string:mixed)) parse_cache = ([]);
+constant CACHE_VALIDITY = 1; //Bump this number to invalidate older cache entries.
 
 //Ensure that a file name is a valid save file. Can be used with completely untrusted names, and
 //will only return true if it is both safe and valid.
@@ -13,7 +14,10 @@ inherit annotated;
 	string filename = SAVE_PATH + "/" + fn;
 	int mtime = file_stat(filename)->?mtime;
 	if (!mtime) return (["mtime": 0]); //File not found
-	if (parse_cache[fn]->?mtime == mtime) return parse_cache[fn];
+	if (mapping c = parse_cache[fn]) {
+		if (c->mtime == mtime && c->validity == CACHE_VALIDITY) return parse_cache[fn];
+		//Otherwise ignore the cached entry and reconstruct.
+	}
 	//NOTE: If this function is made asynchronous or there is any other way that this could run
 	//reentrantly, place a stub in the cache, and validate the stub before returning, blocking
 	//until the first parser has finished.
@@ -314,5 +318,31 @@ inherit annotated;
 			thisloot[key] = num;
 		}
 	}
+
+	//------------- Do some translations and tidyups for convenience -------------//
+	array markers = ({ });
+	foreach (ret->mapmarkers, mapping mark) {
+		//NOTE: A marker with MarkerID\0 of 255 seems possibly to have been deleted??
+		//It's like the slot is left in the array but the marker is simply not shown.
+		//We suppress those from our array, as they are uninteresting.
+		if (mark["MarkerID\0"] == 255) continue;
+		//Would be nice to show if the marker is highlighted. This info may actually be
+		//stored the other way around - a flag on the player saying "highlight this marker".
+		write("[%d] %s (%.0f,%.0f)\n",
+			mark["MarkerID\0"], mark["Name\0"] - "\0",
+			mark["Location\0"]["X\0"], mark["Location\0"]["Y\0"],
+		);
+		markers += ({([
+			"MarkerID": mark["MarkerID\0"],
+			"CategoryName": mark["CategoryName\0"] - "\0",
+			"Color": mark["Color\0"],
+			"IconID": mark["IconID\0"],
+			"Name": mark["Name\0"] - "\0",
+			"compassViewDistance": mark["compassViewDistance\0"] - "\0",
+			"Location": ({mark["Location\0"]["X\0"], mark["Location\0"]["Y\0"], mark["Location\0"]["Z\0"]}),
+		])});
+	}
+	ret->mapmarkers = markers;
+
 	return ret;
 }

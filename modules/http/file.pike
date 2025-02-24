@@ -13,8 +13,5 @@ string websocket_validate(mapping(string:mixed) conn, mapping(string:mixed) msg)
 }
 
 mapping get_state(string|int group) {
-	mapping savefile = cached_parse_savefile(group);
-	return ([
-		"_raw": savefile,
-	]);
+	return cached_parse_savefile(group);
 }
