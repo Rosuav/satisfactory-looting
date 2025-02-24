@@ -1,6 +1,6 @@
 inherit annotated;
 @retain: mapping(string:mapping(string:mixed)) parse_cache = ([]);
-constant CACHE_VALIDITY = 1; //Bump this number to invalidate older cache entries.
+constant CACHE_VALIDITY = 2; //Bump this number to invalidate older cache entries.
 
 //Ensure that a file name is a valid save file. Can be used with completely untrusted names, and
 //will only return true if it is both safe and valid.
@@ -290,7 +290,7 @@ constant CACHE_VALIDITY = 1; //Bump this number to invalidate older cache entrie
 
 	//------------- Augment the loot list from the pristine file -------------//
 	//Which loot items do we already have?
-	mapping haveloot = ret->haveloot = ([]);
+	mapping haveloot = ([]);
 	foreach (ret->loot, [string item, int num, array(float) pos]) {
 		if (!haveloot[item]) haveloot[item] = ([]);
 		haveloot[item][sprintf("%d,%d,%d", @(array(int))pos)] = num;
@@ -318,6 +318,7 @@ constant CACHE_VALIDITY = 1; //Bump this number to invalidate older cache entrie
 			thisloot[key] = num;
 		}
 	}
+	ret->haveloot = mkmapping(L10n(indices(haveloot)[*]), values(haveloot));
 
 	//------------- Do some translations and tidyups for convenience -------------//
 	array markers = ({ });
@@ -328,10 +329,6 @@ constant CACHE_VALIDITY = 1; //Bump this number to invalidate older cache entrie
 		if (mark["MarkerID\0"] == 255) continue;
 		//Would be nice to show if the marker is highlighted. This info may actually be
 		//stored the other way around - a flag on the player saying "highlight this marker".
-		write("[%d] %s (%.0f,%.0f)\n",
-			mark["MarkerID\0"], mark["Name\0"] - "\0",
-			mark["Location\0"]["X\0"], mark["Location\0"]["Y\0"],
-		);
 		markers += ({([
 			"MarkerID": mark["MarkerID\0"],
 			"CategoryName": mark["CategoryName\0"] - "\0",
