@@ -58,6 +58,12 @@ int bootstrap_all()
 int|Concurrent.Future main(int argc,array(string) argv) {
 	add_constant("G", this);
 	G->args = Arg.parse(argv);
+	if (G->args->test) {
+		bootstrap("globals.pike");
+		object parser = bootstrap("modules/parser.pike");
+		parser->cached_parse_savefile(G->args[Arg.REST][0]);
+		return 0;
+	}
 	bootstrap_all();
 	Stdio.stdin->set_read_callback(console);
 	return -1;
