@@ -273,6 +273,7 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 			if (string label = ([
 				"/Game/FactoryGame/Buildable/Factory/SpaceElevator/Build_SpaceElevator.Build_SpaceElevator_C\0": "Space El",
 				"/Game/FactoryGame/Buildable/Factory/TradingPost/Build_TradingPost.Build_TradingPost_C\0": "HUB",
+				//TODO: Also include radar towers? Need a way to distinguish them. Do they have names?
 			])[objects[i][1]])
 				ret->pois += ({({label, objects[i][9..11], prop})});
 		}
