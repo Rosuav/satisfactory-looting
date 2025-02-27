@@ -1,6 +1,6 @@
 inherit annotated;
 @retain: mapping(string:mapping(string:mixed)) parse_cache = ([]);
-constant CACHE_VALIDITY = 4; //Bump this number to invalidate older cache entries.
+constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entries.
 
 //Ensure that a file name is a valid save file. Can be used with completely untrusted names, and
 //will only return true if it is both safe and valid.
@@ -72,7 +72,7 @@ constant CACHE_VALIDITY = 4; //Bump this number to invalidate older cache entrie
 	//write("Sublevels: %d\n", sublevelcount);
 	multiset seen = (<>);
 	ret->crashsites = ({ }); ret->loot = ({ }); ret->visited_areas = ({ });
-	ret->spawners = ({ }); ret->mapmarkers = ({ }); ret->players = ({ });
+	ret->spawners = ({ }); ret->mapmarkers = ({ }); ret->players = ({ }); ret->pois = ({ });
 	while (sublevelcount-- > -1) {
 		int pos = sizeof(decomp) - sizeof(data);
 		//The persistent level (one past the sublevel count) has no name field.
@@ -270,6 +270,11 @@ constant CACHE_VALIDITY = 4; //Bump this number to invalidate older cache entrie
 				ret->spawners += ({({(objects[i][3] / ".")[-1], objects[i][9..11], prop["mSpawnData\0"]})});
 			if (objects[i][1] == "/Game/FactoryGame/Character/Player/Char_Player.Char_Player_C\0")
 				ret->players += ({({prop["mCachedPlayerName\0"] - "\0", objects[i][9..11], prop})});
+			if (string label = ([
+				"/Game/FactoryGame/Buildable/Factory/SpaceElevator/Build_SpaceElevator.Build_SpaceElevator_C\0": "Space El",
+				"/Game/FactoryGame/Buildable/Factory/TradingPost/Build_TradingPost.Build_TradingPost_C\0": "HUB",
+			])[objects[i][1]])
+				ret->pois += ({({label, objects[i][9..11], prop})});
 		}
 		if (sizeof(data) > endpoint) data->read(sizeof(data) - endpoint);
 		[int collected] = data->sscanf("%-4c");

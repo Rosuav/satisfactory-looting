@@ -47,6 +47,7 @@ export function render(state) {
 	set_content("#refloc", [
 		OPTION({value: ""}, "Please select..."),
 		OPTGROUP({label: "Players"}, state.players.map(p => OPTION({value: "P-" + p[0], ".ref_coords": p[1]}, p[0]))),
+		OPTGROUP({label: "POIs"}, state.pois.map(p => OPTION({value: "P-" + p[0], ".ref_coords": p[1]}, p[0]))),
 		OPTGROUP({label: "Markers"}, state.mapmarkers.map(m => OPTION({value: "M-" + m.MarkerID, ".ref_coords": m.Location}, m.Name))),
 		//TODO: "Other" option, allowing user to enter arbitrary coordinates
 	]).value = refloc;
