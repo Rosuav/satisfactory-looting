@@ -18,6 +18,7 @@ void load_sessions() {
 }
 
 @inotify_hook: void savefile_changed(string fn) {
+	if (!has_suffix(fn, ".sav")) return;
 	mapping savefile = cached_parse_savefile(fn);
 	//Purge it from the previous sessions. Most likely this will only happen on deletion, as it's
 	//highly unlikely that a file will move sessions, but it's possible and would be confusing.
