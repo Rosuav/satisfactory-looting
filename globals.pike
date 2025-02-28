@@ -7,8 +7,13 @@ protected void create(string n)
 }
 
 //TODO: Figure out a way to ask Steam where a game is installed, and what the active user is
-string SAVE_PATH = "../.steam/steam/steamapps/compatdata/526870/pfx/drive_c/users/steamuser/Local Settings/Application Data/FactoryGame/Saved/SaveGames/76561198043731689";
-string CONFIG_FILE = "preferences.json";
+constant SATIS_SAVE_PATH = "../.steam/steam/steamapps/compatdata/526870/pfx/drive_c/users/steamuser/Local Settings/Application Data/FactoryGame/Saved/SaveGames/76561198043731689";
+constant EU4_LOCAL_PATH = "../.local/share/Paradox Interactive/Europa Universalis IV";
+//constant EU4_SAVE_PATH = LOCAL_PATH + "/save games"; //Not actually a constant
+constant EU4_PROGRAM_PATH = "../.steam/steam/steamapps/common/Europa Universalis IV"; //Append /map or /common etc to access useful data files
+
+constant CONFIG_FILE = "preferences.json";
+
 //If anything mutates this, call persist_save().
 mapping persist = Standards.JSON.decode_utf8(Stdio.read_file(CONFIG_FILE) || "{}");
 void persist_save() {
@@ -302,4 +307,17 @@ object get_satisfactory_map() {
 		else {Stdio.write_file(mapfile, raw); werror("Map downloaded and saved to %O.\n", mapfile);}
 	}
 	return Image.JPEG.decode(Stdio.read_file(mapfile));
+}
+
+//CAUTION: This function handles EU4 localisation, but L10n() - note the lowercase n - handles
+//Satisfactory localisation. TODO: Merge them.
+string L10N(string key) {return G->CFG->L10n[key] || key;}
+
+int threeplace(string value) {
+	//EU4 uses three-place fixed-point for a lot of things. Return the number as an integer,
+	//ie "3.142" is returned as 3142. Can handle "-0.1" and "-.1", although to my knowledge,
+	//the EU4 files never contain the latter.
+	if (!value) return 0;
+	sscanf(value, "%[-]%[0-9].%[0-9]", string neg, string whole, string frac);
+	return (neg == "-" ? -1 : 1) * ((int)whole * 1000 + (int)sprintf("%.03s", frac + "000"));
 }
