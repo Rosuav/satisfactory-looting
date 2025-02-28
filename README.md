@@ -68,3 +68,8 @@ Test nations at 2919 Luziana and 2892 Araxas
 1. Recreate the calculations, using a fixed dice roll of 5
 2. Show the impact of changing each modifier. Rank the modifiers by how much effect each would have if changed.
 3. Make recommendations about potential changes
+
+TODO: Improve mod support.
+May end up switching all definition loading to parse_config_dir even if there's normally only the
+one file, since it makes mod handling easier. Will need to handle a replace_path block in the mod
+definition, possibly also a dependencies block. See: https://eu4.paradoxwikis.com/Mod_structure

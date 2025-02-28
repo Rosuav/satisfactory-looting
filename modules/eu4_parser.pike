@@ -3,7 +3,7 @@
 #if !constant(G)
 mapping G = ([]); //Prevent compilation errors, but none of the G-> lookups will work
 #endif
-Parser.LR.Parser parser = Parser.LR.GrammarParser.make_parser_from_file("eu4_parse.grammar");
+Parser.LR.Parser parser = Parser.LR.GrammarParser.make_parser_from_file("modules/eu4_parser.grammar");
 
 int retain_map_indices = 0;
 class maparray {
@@ -170,11 +170,11 @@ Image.Image|array(Image.Image|int) load_image(string fn, int|void withhash) {
 }
 
 array(string) find_mod_directories(array(string) mod_filenames) {
-	array config_dirs = ({PROGRAM_PATH});
+	array config_dirs = ({EU4_PROGRAM_PATH});
 	foreach (mod_filenames, string fn) {
-		mapping info = parse_eu4txt(Stdio.read_file(LOCAL_PATH + "/" + fn));
+		mapping info = parse_eu4txt(Stdio.read_file(EU4_LOCAL_PATH + "/" + fn));
 		string path = info->path; if (!path) continue;
-		if (!has_prefix(path, "/")) path = LOCAL_PATH + "/" + path;
+		if (!has_prefix(path, "/")) path = EU4_LOCAL_PATH + "/" + path;
 		config_dirs += ({path});
 	}
 	return config_dirs;
@@ -205,7 +205,7 @@ void update_checksum(object hash, array(string) dirs, string dir, string tail, i
 
 string calculate_checksum(array(string) mod_filenames) {
 	array dirs = find_mod_directories(mod_filenames);
-	mapping manifest = parse_eu4txt(Stdio.read_file(PROGRAM_PATH + "/checksum_manifest.txt"));
+	mapping manifest = parse_eu4txt(Stdio.read_file(EU4_PROGRAM_PATH + "/checksum_manifest.txt"));
 	//The hash stored in the EU4 files is the right length for MD5. However, simply using MD5
 	//here doesn't give the same result. It might be that it's not MD5, it might be that I'm
 	//processing the files in the wrong order, it might be that the file names themselves are
@@ -270,7 +270,7 @@ class GameConfig {
 	}
 	mapping parse_config_dir(string dir, string|void key) {return `|(@gather_config_dir(dir, key));}
 	mapping low_parse_savefile(string fn) { //TODO: Replace all uses with either parse_eu4txt itself or parse_config_dir
-		return parse_eu4txt(Stdio.read_file(PROGRAM_PATH + fn));
+		return parse_eu4txt(Stdio.read_file(EU4_PROGRAM_PATH + fn));
 	}
 
 	mapping(string:string) L10n = ([]);
@@ -317,7 +317,7 @@ class GameConfig {
 		if (!mappingp(province_info)) {
 			//Build up a script file to get the info we need.
 			//We assume that every province that could be of interest to us will be in an area.
-			Stdio.File script = Stdio.File(LOCAL_PATH + "/prov.txt", "wct");
+			Stdio.File script = Stdio.File(EU4_LOCAL_PATH + "/prov.txt", "wct");
 			script->write("log = \"PROV-TERRAIN-BEGIN: " + hash + "\"\n");
 			foreach (sort(indices(prov_area)), string provid) {
 				script->write(
@@ -367,7 +367,7 @@ log = \"PROV-TERRAIN-END\"
 			script->close();
 			//See if the script's already been run (yes, we rebuild the script every time - means you
 			//can rerun it in case there've been changes), and if so, parse and save the data.
-			string log = Stdio.read_file(LOCAL_PATH + "/logs/game.log") || "";
+			string log = Stdio.read_file(EU4_LOCAL_PATH + "/logs/game.log") || "";
 			if (!has_value(log, "PROV-TERRAIN-BEGIN") || !has_value(log, "PROV-TERRAIN-END"))
 				return "Please open up EU4 and, in the console, type: run prov.txt";
 			string terrain = ((log / "PROV-TERRAIN-BEGIN")[-1] / "PROV-TERRAIN-END")[0];
@@ -397,7 +397,7 @@ log = \"PROV-TERRAIN-END\"
 		if (!mod_filenames) {
 			//By default, get the currently-active mods. Can be overridden; pass an empty
 			//array for vanilla, or any specific set of mod names needed.
-			mod_filenames = Standards.JSON.decode_utf8(Stdio.read_file(LOCAL_PATH + "/dlc_load.json"))->enabled_mods;
+			mod_filenames = Standards.JSON.decode_utf8(Stdio.read_file(EU4_LOCAL_PATH + "/dlc_load.json"))->enabled_mods;
 		}
 		config_dirs = find_mod_directories(mod_filenames);
 		active_mods = mod_filenames * ",";
@@ -406,8 +406,8 @@ log = \"PROV-TERRAIN-END\"
 		//It seems that only one of them has the textcolors block that we need.
 		array|mapping tc = gfx->bitmapfonts->textcolors;
 		if (arrayp(tc)) textcolors = (tc - ({0}))[0]; else textcolors = tc;
-		foreach (sort(glob("*.gfx", get_dir(PROGRAM_PATH + "/interface"))), string fn) {
-			string raw = Stdio.read_file(PROGRAM_PATH + "/interface/" + fn);
+		foreach (sort(glob("*.gfx", get_dir(EU4_PROGRAM_PATH + "/interface"))), string fn) {
+			string raw = Stdio.read_file(EU4_PROGRAM_PATH + "/interface/" + fn);
 			//HACK: One of the files has a weird loose semicolon in it! Comment character? Unnecessary separator?
 			raw = replace(raw, ";", "");
 			mapping data = parse_eu4txt(raw);
@@ -676,7 +676,7 @@ log = \"PROV-TERRAIN-END\"
 
 		//TODO: What if a mod changes units? How does that affect this?
 		unit_definitions = ([]);
-		foreach (get_dir(PROGRAM_PATH + "/common/units"), string fn) {
+		foreach (get_dir(EU4_PROGRAM_PATH + "/common/units"), string fn) {
 			mapping data = low_parse_savefile("/common/units/" + fn);
 			unit_definitions[fn - ".txt"] = data;
 		}
@@ -703,8 +703,8 @@ log = \"PROV-TERRAIN-END\"
 		}
 
 		//Parse out localised province names and map from province ID to all its different names
-		foreach (sort(get_dir(PROGRAM_PATH + "/common/province_names")), string fn) {
-			mapping names = parse_eu4txt(Stdio.read_file(PROGRAM_PATH + "/common/province_names/" + fn) + "\n");
+		foreach (sort(get_dir(EU4_PROGRAM_PATH + "/common/province_names")), string fn) {
+			mapping names = parse_eu4txt(Stdio.read_file(EU4_PROGRAM_PATH + "/common/province_names/" + fn) + "\n");
 			string lang = L10n[fn - ".txt"] || fn; //Assuming that "castilian.txt" is the culture Castilian, and "TUR.txt" is the nation Ottomans
 			foreach (names; string prov; array|string name) {
 				if (arrayp(name)) name = name[0]; //The name can be [name, capitalname] but we don't care about the capital name
@@ -840,7 +840,7 @@ void spawn() {
 	object proc = Process.spawn_pike(({"eu4_parse.pike", "--parse"}), (["fds": ({parser_pipe->pipe(Stdio.PROP_NONBLOCK|Stdio.PROP_BIDIRECTIONAL|Stdio.PROP_IPC)})]));
 	parser_pipe->set_nonblocking(parser_pipe_msg, 0) {parser_pipe->close();};
 	//Find the newest .eu4 file in the directory and (re)parse it, then watch for new files.
-	array(string) files = SAVE_PATH + "/" + get_dir(SAVE_PATH)[*];
+	array(string) files = (EU4_LOCAL_PATH + "/save games/") + get_dir(EU4_LOCAL_PATH + "/save games")[*];
 	sort(file_stat(files[*])->mtime, files);
 	if (sizeof(files)) process_savefile(files[-1]);
 }

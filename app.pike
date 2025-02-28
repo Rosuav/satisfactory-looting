@@ -67,6 +67,10 @@ int|Concurrent.Future main(int argc,array(string) argv) {
 			else fn = "help";
 		return (utils[replace(fn, "-", "_")] || utils->help)();
 	}
+	if (G->args->parse) {
+		bootstrap("globals.pike");
+		return bootstrap("modules/eu4_parser.pike")->main();
+	}
 	bootstrap_all();
 	Stdio.stdin->set_read_callback(console);
 	return -1;
