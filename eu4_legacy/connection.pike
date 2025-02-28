@@ -533,50 +533,6 @@ void update_group(string tag) {
 }
 void send_updates_all() {foreach (websocket_groups; string tag;) update_group(tag);}
 
-class Connection(Stdio.File sock) {
-	Stdio.Buffer incoming = Stdio.Buffer(), outgoing = Stdio.Buffer();
-	string notify;
-
-	protected void create() {
-		sock->set_buffer_mode(incoming, outgoing);
-		sock->set_nonblocking(sockread, 0, sockclosed);
-	}
-	void sockclosed() {notifiers[this] = 0; sock->close();}
-
-	string find_country(mapping data, string country) {
-		foreach (data->players_countries / 2, [string name, string tag])
-			if (lower_case(country) == lower_case(name)) country = tag;
-		if (data->countries[country]) return country;
-	}
-
-	void provnotify(string country, int province) {
-		//A request has come in (from the web) to notify a country to focus on a province.
-		if (!notify) return;
-		string tag = find_country(G->G->last_parsed_savefile, notify);
-		if (tag != country) return; //Not found, or not for us.
-		outgoing->sprintf("provfocus %d\n", province);
-		sock->write(""); //Force a write callback (shouldn't be necessary??)
-	}
-
-	void sockread() {
-		while (array ret = incoming->sscanf("%s\n")) {
-			string cmd = String.trim(ret[0]), arg = "";
-			sscanf(cmd, "%s %s", cmd, arg);
-			switch (cmd) {
-				case "notify":
-					notifiers[this] = 0;
-					if (sscanf(arg, "province %s", arg)) ; //notiftype = "province";
-					else sock->write("Warning: Old 'notify' no longer supported, using 'notify province' instead\n");
-					notify = arg; notifiers[this] = 1;
-					break;
-				default: sock->write(sprintf("Unknown command %O\n", cmd)); break;
-			}
-		}
-	}
-}
-
-void sock_connected(object mainsock) {while (object sock = mainsock->accept()) Connection(sock);}
-
 object tlsctx;
 class trytls {
 	inherit Protocols.WebSocket.Request;
@@ -607,7 +563,5 @@ protected void create(string name) {
 			wildcard = UNDEFINED; //Only one wildcard cert.
 		}
 	}
-	Stdio.Port mainsock = Stdio.Port();
-	mainsock->bind(1444, sock_connected, "::", 1);
 	G->G->have_sockets = 1;
 }

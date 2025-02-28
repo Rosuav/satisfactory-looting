@@ -84,11 +84,54 @@ void ws_handler(array(string) proto, Protocols.WebSocket.Request req) {
 	sock->onclose = ws_close;
 }
 
+@retain: multiset notifiers = (<>);
+class Connection(Stdio.File sock) {
+	Stdio.Buffer incoming = Stdio.Buffer(), outgoing = Stdio.Buffer();
+	string notify;
+
+	protected void create() {
+		sock->set_buffer_mode(incoming, outgoing);
+		sock->set_nonblocking(sockread, 0, sockclosed);
+	}
+	void sockclosed() {notifiers[this] = 0; sock->close();}
+
+	string find_country(mapping data, string country) {
+		foreach (data->players_countries / 2, [string name, string tag])
+			if (lower_case(country) == lower_case(name)) country = tag;
+		if (data->countries[country]) return country;
+	}
+
+	void provnotify(string country, int province) {
+		//A request has come in (from the web) to notify a country to focus on a province.
+		if (!notify) return;
+		string tag = find_country(G->G->last_parsed_savefile, notify);
+		if (tag != country) return; //Not found, or not for us.
+		outgoing->sprintf("provfocus %d\n", province);
+		sock->write(""); //Force a write callback (shouldn't be necessary??)
+	}
+
+	void sockread() {
+		while (array ret = incoming->sscanf("%s\n")) {
+			string cmd = String.trim(ret[0]), arg = "";
+			sscanf(cmd, "%s %s", cmd, arg);
+			switch (cmd) {
+				case "notify":
+					notifiers[this] = 0;
+					if (sscanf(arg, "province %s", arg)) ; //notiftype = "province";
+					else sock->write("Warning: Old 'notify' no longer supported, using 'notify province' instead\n");
+					notify = arg; notifiers[this] = 1;
+					break;
+				default: sock->write(sprintf("Unknown command %O\n", cmd)); break;
+			}
+		}
+	}
+}
+void sock_connected(object mainsock) {while (object sock = mainsock->accept()) Connection(sock);}
+
 protected void create(string name)
 {
 	::create(name);
 	register_bouncer(ws_handler); register_bouncer(ws_msg); register_bouncer(ws_close);
-	mapping http = G->G->instance_config;
 	if (mixed ex = catch {
 		string cert = Stdio.read_file("../stillebot/certificate.pem");
 		string cert2 = Stdio.read_file("../stillebot/certificate_local.pem");
@@ -114,6 +157,8 @@ protected void create(string name)
 					wildcard = UNDEFINED; //Only one wildcard cert.
 				}
 			}
+			//TODO: Switch port to 8087 to complete the migration (part 1)
+			//TODO: Also listen on 1444 to complete the migration (part 2)
 			G->G->httpserver = Protocols.WebSocket.Port(http_handler, ws_handler, 1200, "::");
 			G->G->httpserver->request_program = Function.curry(trytls)(ws_handler);
 		}
@@ -123,4 +168,6 @@ protected void create(string name)
 		//Ensure that we don't accidentally use something unsafe (eg if it's an SSL issue)
 		if (object http = m_delete(G->G, "httpserver")) catch {http->close();};
 	}
+	if (G->G->notify_mainsock) G->G->notify_mainsock->set_accept_callback(sock_connected);
+	else (G->G->notify_mainsock = Stdio.Port())->bind(1821, sock_connected, "::", 1); //TODO: Switch port to 1444 to complete the migration (part 1)
 }
