@@ -1,8 +1,5 @@
 inherit annotated;
 
-array(function|array) find_http_handler(string not_query) {
-}
-
 __async__ void http_handler(Protocols.HTTP.Server.Request req) {
 	array args = ({ });
 	//Simple lookups are like http_endpoints["listrewards"], without the slash.
