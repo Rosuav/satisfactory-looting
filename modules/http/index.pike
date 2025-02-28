@@ -1,3 +1,7 @@
+//TODO: Make this a useful landing page for both Satisfactory and EU4
+//List Satisfactory saves with links to /file/ and /session/, and EU4 tags
+//with links to /tag/.
+
 inherit http_websocket;
 inherit annotated;
 
@@ -9,8 +13,8 @@ mapping(string:mixed)|string|Concurrent.Future http_request(Protocols.HTTP.Serve
 }
 
 mapping get_state(string|int group) {
-	array files = glob("*.sav", get_dir(SAVE_PATH));
-	array paths = (SAVE_PATH + "/") + files[*];
+	array files = glob("*.sav", get_dir(SATIS_SAVE_PATH));
+	array paths = (SATIS_SAVE_PATH + "/") + files[*];
 	array mtimes = file_stat(paths[*])->?mtime;
 	sort(mtimes[*] * -1, files); //Sort by modification time descending, ie newest at the top
 	//Sort sessions by the most recent save file in each one

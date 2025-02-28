@@ -810,14 +810,18 @@ int main() {
 	return -1;
 }
 
+//FIXME: Send to every EU4 socket but not Satisfactory ones
+void update_all_eu4() { /* ... */ }
+void send_to_all_eu4(mapping msg) { /* ... */ }
+
 //Spawn and communicate with the parser subprocess
 Stdio.File parser_pipe = G->G->parser_pipe;
 int parsing = -1;
-void process_savefile(string fn) {parsing = 0; G->G->connection->send_updates_all(); parser_pipe->write(fn + "\n");}
+void process_savefile(string fn) {parsing = 0; update_all_eu4(); parser_pipe->write(fn + "\n");}
 void parser_pipe_msg(object pipe, string msg) {
 	msg += parser_pipe->read() || ""; //Purge any spare text
 	foreach ((array)msg, int chr) {
-		if (chr <= 100) {parsing = chr; G->G->connection->send_to_all((["cmd": "update", "parsing": parsing]));}
+		if (chr <= 100) {parsing = chr; send_to_all_eu4((["cmd": "update", "parsing": parsing]));}
 		if (chr == '~') {
 			mapping data = Standards.JSON.decode_utf8(Stdio.read_file("eu4_parse.json") || "{}")->data;
 			if (!data) {werror("Unable to parse save file (see above for errors, hopefully)\n"); return;}
@@ -831,7 +835,7 @@ void parser_pipe_msg(object pipe, string msg) {
 			foreach (data->provinces; string id; mapping prov) prov->id = -(int)id;
 			G->G->provincecycle = ([]);
 			G->G->last_parsed_savefile = data;
-			parsing = -1; G->G->connection->send_updates_all();
+			parsing = -1; update_all_eu4();
 		}
 	}
 }
@@ -846,6 +850,12 @@ void spawn() {
 }
 
 protected void create() {
+	//TODO: Replace G->CFG with a mapping from checksum to game config.
+	//Whenever something needs the config, look up the checksum, and fetch the config
+	//as needed. Whenever something needs the config for a specific file, ???. And
+	//whenever something just needs "any config" (for the kinds of things that rarely
+	//change), have a default config, which will be the one that starts out as Null.
+	if (!G->CFG) G->CFG = NullGameConfig();
 	if (!parser_pipe) parser_pipe = G->G->parser_pipe = Stdio.File();
 	G->G->parser = this; //Yes, this one is eu4_parser.pike but puts itself in as G->G->parser.
 	if (!G->G->args->parse && !G->G->parser_proc) spawn();

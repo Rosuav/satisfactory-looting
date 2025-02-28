@@ -1,6 +1,7 @@
 array(string) bootstrap_files = ({"globals.pike", "connection.pike", "modules", "modules/http"});
 array(string) restricted_update;
 mapping G = (["consolecmd": ([]), "dbsettings": ([]), "instance_config": ([])]);
+object CFG; //TODO: Rework this and don't have it here (see eu4_parser.pike TODO)
 
 void console(object stdin, string buf) {
 	while (has_value(buf, "\n")) {

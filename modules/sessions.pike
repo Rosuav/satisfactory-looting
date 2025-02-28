@@ -8,7 +8,7 @@ inherit annotated;
 @retain: mapping(string:string) file_sessions = ([]);
 
 void load_sessions() {
-	foreach (glob("*.sav", get_dir(SAVE_PATH)), string fn) {
+	foreach (glob("*.sav", get_dir(SATIS_SAVE_PATH)), string fn) {
 		mapping savefile = cached_parse_savefile(fn);
 		string s = savefile->session; if (!s) continue; //File has vanished, or can't be parsed
 		if (!session_mtimes[s]) session_mtimes[s] = ([]);

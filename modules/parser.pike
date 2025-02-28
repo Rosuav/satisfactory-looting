@@ -5,13 +5,13 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 //Ensure that a file name is a valid save file. Can be used with completely untrusted names, and
 //will only return true if it is both safe and valid.
 @export: int(1bit) check_savefile_name(string fn) {
-	return has_value(get_dir(SAVE_PATH), fn);
+	return has_value(get_dir(SATIS_SAVE_PATH), fn);
 }
 
 @export: mapping cached_parse_savefile(string fn) {
 	//NOTE: This does not validate the file name by ensuring that it is found in the directory.
 	//If the file name comes from an untrusted source, first call check_savefile_name() above.
-	string filename = SAVE_PATH + "/" + fn;
+	string filename = SATIS_SAVE_PATH + "/" + fn;
 	int mtime = file_stat(filename)->?mtime;
 	if (!mtime) return (["mtime": 0]); //File not found
 	if (mapping c = parse_cache[fn]) {
