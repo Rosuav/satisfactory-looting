@@ -147,17 +147,17 @@ void websocket_cmd_highlight(mapping conn, mapping data) {
 	mapping prefs = tag_prefs(conn->group);
 	if (!G->CFG->building_types[data->building]) m_delete(prefs, "highlight_interesting");
 	else prefs->highlight_interesting = data->building;
-	persist_save(); update_group(conn->group);
+	persist_save(); send_updates_all(conn->group);
 }
 
 void websocket_cmd_fleetpower(mapping conn, mapping data) {
 	mapping prefs = tag_prefs(conn->group);
 	prefs->fleetpower = threeplace(data->power) || 1000;
-	persist_save(); update_group(conn->group);
+	persist_save(); send_updates_all(conn->group);
 }
 
 void websocket_cmd_goto(mapping conn, mapping data) {
-	indices(notifiers)->provnotify(data->tag, (int)data->province);
+	indices(G->notifiers)->provnotify(data->tag, (int)data->province);
 }
 
 void websocket_cmd_pin(mapping conn, mapping data) {
@@ -165,7 +165,7 @@ void websocket_cmd_pin(mapping conn, mapping data) {
 	mapping pins = prefs->pinned_provinces; if (!pins) pins = prefs->pinned_provinces = ([]);
 	if (pins[data->province]) m_delete(pins, data->province);
 	else /*if (G->G->last_parsed_savefile->provinces["-" + data->province])*/ pins[data->province] = max(@values(pins)) + 1;
-	persist_save(); update_group(conn->group);
+	persist_save(); send_updates_all(conn->group);
 }
 
 void websocket_cmd_cyclegroup(mapping conn, mapping data) {
@@ -173,7 +173,7 @@ void websocket_cmd_cyclegroup(mapping conn, mapping data) {
 	if (!data->cyclegroup || data->cyclegroup == "") m_delete(prefs, "cyclegroup");
 	else prefs->cyclegroup = data->cyclegroup;
 	m_delete(G->G->provincecycle, conn->group);
-	persist_save(); update_group(conn->group);
+	persist_save(); send_updates_all(conn->group);
 }
 
 void websocket_cmd_cycleprovinces(mapping conn, mapping data) {
@@ -181,7 +181,7 @@ void websocket_cmd_cycleprovinces(mapping conn, mapping data) {
 	if (prefs->cyclegroup != data->cyclegroup) return;
 	if (!prefs->cyclegroup || !arrayp(data->provinces)) m_delete(G->G->provincecycle, conn->group);
 	else G->G->provincecycle[conn->group] = (array(string))(array(int))data->provinces - ({"0"});
-	persist_save(); update_group(conn->group);
+	persist_save(); send_updates_all(conn->group);
 }
 
 void websocket_cmd_cyclenext(mapping conn, mapping data) {
@@ -190,14 +190,14 @@ void websocket_cmd_cyclenext(mapping conn, mapping data) {
 	if (!arrayp(G->G->provincecycle[country])) return; //Can't use this for the default cycling of "interesting" provinces. Pick explicitly.
 	[int id, array rest] = Array.shift(G->G->provincecycle[country]);
 	G->G->provincecycle[country] = rest + ({id});
-	update_group(country);
-	indices(notifiers)->provnotify(data->tag, (int)id);
+	send_updates_all(country);
+	indices(G->notifiers)->provnotify(data->tag, (int)id);
 }
 
 void websocket_cmd_search(mapping conn, mapping data) {
 	mapping prefs = tag_prefs(conn->group);
 	prefs->search = stringp(data->term) ? lower_case(data->term) : "";
-	persist_save(); update_group(conn->group);
+	persist_save(); send_updates_all(conn->group);
 }
 
 void websocket_cmd_set_effect_mode(mapping conn, mapping data) {
@@ -208,21 +208,21 @@ void websocket_cmd_set_effect_mode(mapping conn, mapping data) {
 	//Note that currently-connected clients do not get updated.
 }
 
-void websocket_cmd_listcustoms(mapping conn, mapping data) {
-	string customdir = LOCAL_PATH + "/custom nations";
+mapping websocket_cmd_listcustoms(mapping conn, mapping data) {
+	string customdir = EU4_LOCAL_PATH + "/custom nations";
 	mapping nations = ([]);
 	foreach (sort(get_dir(customdir)), string fn)
 		nations[fn] = G->G->parser->parse_eu4txt(Stdio.read_file(customdir + "/" + fn));
-	send_update(({conn->sock}), ([
+	return ([
 		"cmd": "customnations",
 		"nations": nations,
 		"custom_ideas": G->CFG->custom_ideas,
 		"effect_display_mode": persist->effect_display_mode,
 		"map_colors": G->CFG->custom_country_colors->color,
-	]));
+	]);
 }
 
-void websocket_cmd_analyzebattles(mapping conn, mapping msg) {
+mapping websocket_cmd_analyzebattles(mapping conn, mapping msg) {
 	//Collect some useful info about the units a country is using
 	//NOTE: Can be used for countries you're not at war with (yet), to allow for
 	//Luke 14:31-32 style analysis, but be aware that it may provide information
@@ -231,13 +231,13 @@ void websocket_cmd_analyzebattles(mapping conn, mapping msg) {
 	//how many in any given stack, unless they're near your borders.) Unlikely
 	//to be of massively unbalancing value, since you could usually see one army
 	//and deduce that others will be similar.
-	mapping data = G->G->last_parsed_savefile; if (!data) return;
+	mapping data = G->G->last_parsed_savefile; if (!data) return 0;
 	array countries = ({
 		//Could add others if necessary eg allies/subjects. For now, reanalyze with those tags.
 		data->countries[group_to_tag(data, conn->group)],
 		data->countries[msg->tag],
 	});
-	if (has_value(countries, 0)) return;
+	if (has_value(countries, 0)) return 0;
 	array infos = ({ });
 	int combat_width = 15;
 	foreach (countries, mapping country) {
@@ -280,11 +280,11 @@ void websocket_cmd_analyzebattles(mapping conn, mapping msg) {
 		if (wid > combat_width) combat_width = wid; //NOTE: If reworking this for naval combat, remember that naval combat width is per side.
 		infos += ({info});
 	}
-	send_update(({conn->sock}), ([
+	return ([
 		"cmd": "analyzebattles",
 		"countries": infos,
 		"combat_width": combat_width,
-	]));
+	]);
 }
 
 constant custnat_keys = "name adjective country_colors index graphical_culture technology_group religion "
@@ -339,7 +339,7 @@ string save_custom_nation(mapping data) {
 	//4) All attributes to be saved must be included.
 	//It's up to you to make sure the file actually is loadable. The easiest way is to
 	//make minor, specific changes to an existing custom nation.
-	string customdir = LOCAL_PATH + "/custom nations";
+	string customdir = EU4_LOCAL_PATH + "/custom nations";
 	string fn = data->filename; if (!fn) return "Need a file name";
 	if (!has_value(get_dir(customdir), fn)) return "File not found";
 	sscanf(Stdio.read_file(customdir + "/" + fn), "# Editable: %s\n", string pwd);
@@ -357,19 +357,18 @@ string save_custom_nation(mapping data) {
 		else if (arrayp(val) || mappingp(val)) {
 			function|string f = custnat_handlers[key];
 			if (stringp(f)) f = custnat_handlers[f]; //Alias one to another
-			if (f) output += sprintf("%s=%s\n", key, f(val));
+			if (f) output += sprintf("%s=%s\n", key, ((function)f)(val));
 		}
 	}
 	Stdio.write_file(customdir + "/" + fn, output);
 	return "Saved.";
 }
 
-void websocket_cmd_savecustom(mapping conn, mapping data) {
-	string ret = save_custom_nation(data);
-	send_update(({conn->sock}), ([
+mapping websocket_cmd_savecustom(mapping conn, mapping data) {
+	return ([
 		"cmd": "savecustom",
-		"result": ret,
-	]));
+		"result": save_custom_nation(data),
+	]);
 }
 
 protected void create(string name) {

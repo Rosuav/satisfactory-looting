@@ -847,4 +847,5 @@ void spawn() {
 
 protected void create() {
 	if (!parser_pipe) parser_pipe = G->G->parser_pipe = Stdio.File();
+	G->G->parser = this;
 }
