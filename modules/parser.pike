@@ -274,6 +274,7 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 				"/Game/FactoryGame/Buildable/Factory/SpaceElevator/Build_SpaceElevator.Build_SpaceElevator_C\0": "Space El",
 				"/Game/FactoryGame/Buildable/Factory/TradingPost/Build_TradingPost.Build_TradingPost_C\0": "HUB",
 				//TODO: Also include radar towers? Need a way to distinguish them. Do they have names?
+				//Would it be worth identifying the biome that a radar tower is in? "Radar Tower (Grasslands)"
 			])[objects[i][1]])
 				ret->pois += ({({label, objects[i][9..11], prop})});
 		}
