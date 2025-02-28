@@ -9,8 +9,9 @@ protected void create(string n)
 //TODO: Figure out a way to ask Steam where a game is installed, and what the active user is
 string SAVE_PATH = "../.steam/steam/steamapps/compatdata/526870/pfx/drive_c/users/steamuser/Local Settings/Application Data/FactoryGame/Saved/SaveGames/76561198043731689";
 string CONFIG_FILE = "satisfactory-savefile.json";
-//If anything updates this, write it back. Manually.
+//If anything mutates this, call persist_save().
 mapping persist = Standards.JSON.decode_utf8(Stdio.read_file(CONFIG_FILE) || "{}");
+void persist_save() {Stdio.write_file(CONFIG_FILE, Standards.JSON.encode(persist, 5));}
 
 //Can this be loaded from a localization file or something?
 constant ITEM_NAMES = ([
