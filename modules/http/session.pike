@@ -4,11 +4,14 @@ inherit annotated;
 constant http_path_pattern = "/session/%[^/]";
 
 mapping(string:mixed)|string|Concurrent.Future http_request(Protocols.HTTP.Server.Request req, string session) {
-	return render(req, (["vars": ([
-		"ws_group": Protocols.HTTP.Server.http_decode_string(session),
-		"ws_code": "file",
-		"item_names": ITEM_NAMES,
-	])]));
+	return render(req, ([
+		"title": "Satisfactory Looting",
+		"vars": ([
+			"ws_group": Protocols.HTTP.Server.http_decode_string(session),
+			"ws_code": "file",
+			"item_names": ITEM_NAMES,
+		]),
+	]));
 }
 
 //Note that we don't bother validating the socket; since the state is safe, you'll just get null state back.

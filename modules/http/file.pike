@@ -4,10 +4,13 @@ inherit annotated;
 constant http_path_pattern = "/file/%[^/]";
 
 mapping(string:mixed)|string|Concurrent.Future http_request(Protocols.HTTP.Server.Request req, string filename) {
-	return render(req, (["vars": ([
-		"ws_group": Protocols.HTTP.Server.http_decode_string(filename),
-		"item_names": ITEM_NAMES,
-	])]));
+	return render(req, ([
+		"title": "Satisfactory Looting",
+		"vars": ([
+			"ws_group": Protocols.HTTP.Server.http_decode_string(filename),
+			"item_names": ITEM_NAMES,
+		]),
+	]));
 }
 
 //Validation is done once per socket, and after that, we assume that the file is still valid.
