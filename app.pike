@@ -58,7 +58,7 @@ int bootstrap_all()
 int|Concurrent.Future main(int argc,array(string) argv) {
 	add_constant("G", this);
 	G->args = Arg.parse(argv);
-	if (G->args->help) G->args->exec = "help";
+	foreach ("test help" / " ", string cmd) if (G->args[cmd]) G->args->exec = cmd; //"--test" is a synonym for "--exec=test"
 	if (string fn = G->args->exec) {
 		bootstrap("globals.pike");
 		object utils = bootstrap("utils.pike");
