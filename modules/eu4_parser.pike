@@ -857,6 +857,7 @@ protected void create() {
 	//change), have a default config, which will be the one that starts out as Null.
 	if (!G->CFG) G->CFG = NullGameConfig();
 	if (!parser_pipe) parser_pipe = G->G->parser_pipe = Stdio.File();
+	else parser_pipe->set_read_callback(parser_pipe_msg);
 	G->G->parser = this; //Yes, this one is eu4_parser.pike but puts itself in as G->G->parser.
 	if (!G->G->args->parse && !G->G->parser_proc) spawn();
 }
