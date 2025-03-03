@@ -22,7 +22,7 @@ mapping get_state(string|int group) {
 	return savefile->mtime && savefile;
 }
 
-@inotify_hook: void savefile_changed(string fn) {call_out(update_by_fn, 0.125, fn);}
+@inotify_hook: void savefile_changed(string cat, string fn) {if (cat == "satis") call_out(update_by_fn, 0.125, fn);}
 void update_by_fn(string fn) {
 	if (!has_suffix(fn, ".sav")) return;
 	if (string sess = G->G->file_sessions[fn]) send_updates_all(sess);

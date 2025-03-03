@@ -27,11 +27,11 @@ mapping get_state(string|int group) {
 	]);
 }
 
-@inotify_hook: void savefile_changed(string fn) {
+@inotify_hook: void savefile_changed(string cat, string fn) {
 	//Note that there may still be a temporary backup file here. Rather than
 	//send out updates twice in quick succession, causing flicker, we delay until
 	//the old file has likely been deleted.
-	call_out(send_updates_all, 0.25, "");
+	if (cat == "satis") call_out(send_updates_all, 0.25, "");
 }
 
 protected void create(string name) {::create(name);}

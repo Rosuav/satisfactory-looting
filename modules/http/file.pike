@@ -24,8 +24,8 @@ mapping get_state(string|int group) {
 	return savefile->mtime && savefile; //If the file doesn't exist, don't return any state at all, it's not useful.
 }
 
-@inotify_hook: void savefile_changed(string fn) {
-	send_updates_all(fn);
+@inotify_hook: void savefile_changed(string cat, string fn) {
+	if (cat == "satis") send_updates_all(fn);
 }
 
 mapping websocket_cmd_findloot(mapping(string:mixed) conn, mapping(string:mixed) msg) {

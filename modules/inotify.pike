@@ -11,7 +11,7 @@ protected void create(string name) {
 		[int event, int cookie, string path] = __ARGS__;
 		//Note that the same hook is called on deletion as on creation. If you care about the difference,
 		//stat the file on arrival.
-		values(G->G->inotify_hooks)(basename(path));
+		values(G->G->inotify_hooks)("satis", basename(path));
 	};
 	inot->set_nonblocking();
 }
