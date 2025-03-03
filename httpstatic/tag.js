@@ -4,6 +4,7 @@ const {BLOCKQUOTE, I, PRE} = lindt; //Currently autoimport doesn't recognize the
 
 let defaultsection = null; //If nonnull, will autoopen this section
 
+document.body.appendChild(choc.STYLE({id: "ideafilterstyles"}));
 document.body.appendChild(replace_content(null, DIALOG({id: "customnationsdlg"}, SECTION([
 	HEADER([H3("Custom nations"), DIV(BUTTON({type: "button", class: "dialog_cancel"}, "x"))]),
 	DIV([

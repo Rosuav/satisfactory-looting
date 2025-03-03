@@ -5,7 +5,6 @@ constant http_path_pattern = "/tag/%[^/]";
 
 mapping(string:mixed)|string|Concurrent.Future http_request(Protocols.HTTP.Server.Request req, string tag) {
 	return render(req, ([
-		"head_scripts": "<style id=ideafilterstyles></style>",
 		"title": "EU4 Savefile Analysis",
 		"vars": ([
 			"ws_group": tag,
