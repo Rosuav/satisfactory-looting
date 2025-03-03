@@ -45,13 +45,8 @@ mapping get_state(string group) {
 	string tag = group_to_tag(data, group);
 	mapping country = data->countries[tag];
 	if (!country) return (["error": "Country/player not found: " + group]);
-	mapping ret = (["tag": tag, "self": data->countries[tag], "highlight": ([]), "recent_peace_treaties": G->G->recent_peace_treaties]);
-	ret->capital_province = data->provinces["-" + data->countries[tag]->capital];
-	G->G->analysis->analyze(data, group, tag, ret, tag_prefs(group));
-	multiset players = (multiset)((data->players_countries || ({ })) / 2)[*][1]; //Normally, show all wars involving players.
-	if (!players[tag]) players = (<tag>); //But if you switch to a non-player country, show that country's wars instead.
-	G->G->analysis->analyze_wars(data, players, ret);
-	G->G->analysis->analyze_flagships(data, ret);
+	mapping ret = analyze_eu4_savefile(data, group, tag, tag_prefs(group));
+	//ret->self = data->countries[tag]; ret->capital_province = data->provinces["-" + data->countries[tag]->capital];
 	//Enumerate available building types for highlighting. TODO: Check if some changes here need to be backported to the console interface.
 	mapping available = ([]);
 	mapping tech = country->technology;

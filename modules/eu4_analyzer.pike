@@ -1,10 +1,11 @@
 //Various functions to do different forms of savefile analysis.
-//The primary entrypoint is analyze() which receives a savefile (as a mapping),
+//The primary entrypoint is analyze_eu4_savefile() which receives a savefile (as a mapping),
 //a country (and optionally player name) to analyze, and the user prefs; it will
 //return the useful and interesting data as a mapping.
 
 //Note that analyzing may mutate the savefile mapping, but only to cache information
 //that would not change without the savefile itself changing.
+inherit annotated;
 
 void analyze_cot(mapping data, string name, string tag, mapping write) {
 	mapping country = data->countries[tag];
@@ -2231,14 +2232,6 @@ void analyze_obscurities(mapping data, string name, string tag, mapping write, m
 	sort(sortkeys, write->golden_eras);
 }
 
-void analyze(mapping data, string name, string tag, mapping write, mapping|void prefs) {
-	write->name = name + " (" + (data->countries[tag]->name || L10N(tag)) + ")";
-	write->fleetpower = prefs->fleetpower || 1000;
-	({analyze_cot, analyze_leviathans, analyze_furnace, analyze_upgrades})(data, name, tag, write);
-	analyze_obscurities(data, name, tag, write, prefs || ([]));
-	if (string highlight = prefs->highlight_interesting) analyze_findbuildings(data, name, tag, write, highlight);
-}
-
 //Not currently triggered from anywhere. Doesn't currently have a primary use-case.
 void show_tradegoods(mapping data, string tag) {
 	//write("Sevilla: %O\n", data->provinces["-224"]);
@@ -2293,7 +2286,7 @@ void analyze_flagships(mapping data, mapping write) {
 }
 
 void analyze_wars(mapping data, multiset(string) tags, mapping write) {
-	write->wars = (["current": ({ }), "rumoured": G->G->war_rumours]);
+	write->wars = (["current": ({ }), "rumoured": G->G->war_rumours || ({ })]);
 	foreach (values(Array.arrayify(data->active_war)), mapping war) {
 		if (!mappingp(war)) continue; //Dunno what's with these, there seem to be some strings in there.
 		//To keep displaying the war after all players separate-peace out, use
@@ -2437,37 +2430,17 @@ void analyze_states(mapping data, string name, string tag, mapping write, mappin
 	}
 }
 
-protected void create() {
-	mapping data = G->G->last_parsed_savefile;
-	if (!data) return;
-	//analyze_states(data, "Rosuav", data->players_countries[1], write, ([]));
-	//analyze_obscurities(data, "Rosuav", data->players_countries[1], write, ([]));
-	//NOTE: Tolerances seem to be being incorrectly calculated for theocracies.
-	//NOTE: Reform "Expand Temple Rights" aka secure_clergy_power_reform does not
-	//seem to properly apply its effect. Possible issue with has_tax_building_trigger?
-	//werror("702: %O\n", provincial_unrest(data, "702", 1));
-	mapping country = data->countries[data->player];
-	m_delete(country, "all_country_modifiers");
-	mapping attrs = all_country_modifiers(data, country);
-	foreach (({
-		"military_tactics", "discipline", "base_land_morale", "land_morale",
-		"infantry_fire", "infantry_shock",
-		"cavalry_fire", "cavalry_shock",
-		"artillery_fire", "artillery_shock",
-		"infantry_power", "cavalry_power", "artillery_power",
-		"morale_damage", "morale_damage_received",
-		"global_defender_dice_roll_bonus", "global_attacker_dice_roll_bonus",
-		"combat_width",
-	}), string mod) {
-		werror("%s: %d%{\n\t%s%}\n", L10N(mod), attrs[mod], attrs->_sources[mod] || ({ }));
-	}
-	return;
-	DEBUG_TRIGGER_MATCHES = 1;
-	foreach (G->CFG->triggered_modifiers; string id; mapping mod) {
-		string label = "Applicable!";
-		if (mod->potential && !trigger_matches(data, ({country}), "AND", mod->potential)) label = "Not potent.";
-		else if (!trigger_matches(data, ({country}), "AND", mod->trigger)) label = "Not trigger";
-		werror("%s -- Triggered Modifier: %s %O\n", label, id, L10N(id));
-	}
-	DEBUG_TRIGGER_MATCHES = 0;
+//Top-level entrypoint. Analyze the given savefile data with respect to the given country tag.
+@export: mapping analyze_eu4_savefile(mapping data, string name, string tag, mapping|void prefs) {
+	mapping ret = (["tag": tag, "highlight": ([]), "recent_peace_treaties": G->G->recent_peace_treaties || ({ })]);
+	ret->name = name + " (" + (data->countries[tag]->name || L10N(tag)) + ")";
+	ret->fleetpower = prefs->fleetpower || 1000;
+	({analyze_cot, analyze_leviathans, analyze_furnace, analyze_upgrades})(data, name, tag, ret);
+	analyze_obscurities(data, name, tag, ret, prefs || ([]));
+	if (string highlight = prefs->highlight_interesting) analyze_findbuildings(data, name, tag, ret, highlight);
+	multiset players = (multiset)((data->players_countries || ({ })) / 2)[*][1]; //Normally, show all wars involving players.
+	if (!players[tag]) players = (<tag>); //But if you switch to a non-player country, show that country's wars instead.
+	analyze_wars(data, players, ret);
+	analyze_flagships(data, ret);
+	return ret;
 }

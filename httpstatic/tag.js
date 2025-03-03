@@ -1,4 +1,3 @@
-//Not to be confused with eu4_parse.json which is a cache
 import {lindt, replace_content, DOM, fix_dialogs} from "https://rosuav.github.io/choc/factory.js";
 const {A, ABBR, B, BR, BUTTON, DETAILS, DIALOG, DIV, FORM, H1, H3, H4, HEADER, IMG, INPUT, LABEL, LI, NAV, OPTGROUP, OPTION, P, SECTION, SELECT, SPAN, STRONG, SUMMARY, TABLE, TD, TH, THEAD, TR, UL} = lindt; //autoimport
 const {BLOCKQUOTE, I, PRE} = lindt; //Currently autoimport doesn't recognize the section() decorator
