@@ -267,6 +267,9 @@ class http_websocket {
 		if (dest && sizeof(dest)) _send_updates(dest, group, data);
 	}
 
+	void update_all_groups() {send_updates_all(indices(websocket_groups)[*]);}
+	void send_to_all(mapping msg) {_low_send_updates(msg, values(websocket_groups) * ({ }));}
+
 	protected void create(string name)
 	{
 		::create(name);

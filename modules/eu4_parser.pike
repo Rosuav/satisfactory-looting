@@ -810,9 +810,8 @@ int main() {
 	return -1;
 }
 
-//FIXME: Send to every EU4 socket but not Satisfactory ones
-void update_all_eu4() { /* ... */ }
-void send_to_all_eu4(mapping msg) { /* ... */ }
+void send_to_all_eu4(mapping msg) {G->G->websocket_types->tag->send_to_all(msg);}
+void update_all_eu4() {G->G->websocket_types->tag->update_all_groups();}
 
 //Spawn and communicate with the parser subprocess
 Stdio.File parser_pipe = G->G->parser_pipe;
