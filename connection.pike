@@ -159,7 +159,7 @@ protected void create(string name)
 			}
 			//TODO: Switch port to 8087 to complete the migration (part 1)
 			//TODO: Also listen on 1444 to complete the migration (part 2)
-			G->G->httpserver = Protocols.WebSocket.Port(http_handler, ws_handler, 1200, "::");
+			G->G->httpserver = Protocols.WebSocket.Port(http_handler, ws_handler, 8087, "::");
 			G->G->httpserver->request_program = Function.curry(trytls)(ws_handler);
 		}
 	}) {
