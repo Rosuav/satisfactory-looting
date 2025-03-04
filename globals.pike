@@ -21,7 +21,7 @@ void persist_save() {
 	foreach (indices(persist->tag_preferences), string tag) {
 		mapping tp = persist->tag_preferences[tag];
 		if (tp->search == "") m_delete(tp, "search");
-		if (!sizeof(tp->pinned_provinces)) m_delete(tp, "pinned_provinces");
+		if (tp->pinned_provinces && !sizeof(tp->pinned_provinces)) m_delete(tp, "pinned_provinces");
 		if (!sizeof(tp)) m_delete(persist->tag_preferences, tag);
 	}
 	Stdio.write_file(CONFIG_FILE, Standards.JSON.encode(persist, 5));
