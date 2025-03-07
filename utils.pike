@@ -10,7 +10,6 @@ void help() {
 
 @"Edited as needed, does what's needed":
 void test() {
-	mapping persist = Standards.JSON.decode_utf8(Stdio.read_file(CONFIG_FILE) || "{}");
-	mapping eu4 = Standards.JSON.decode_utf8(Stdio.read_file("../EU4Parse/preferences.json") || "{}");
-	Stdio.write_file(CONFIG_FILE, Standards.JSON.encode(persist | eu4, 7));
+	mapping save = G->bootstrap("modules/parser.pike")->cached_parse_savefile("Assembly First_autosave_1.sav");
+	write("Got save %O\n", indices(save));
 }
