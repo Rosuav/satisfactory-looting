@@ -113,24 +113,21 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 			mapping obj = ([]); objects[i] += ({obj});
 			[obj->ver, obj->flg, int sz] = data->sscanf("%-4c%-4c%-4c");
 			int propend = sizeof(data) - sz;
-			obj->rawbytes = ((string)data)[..sz-1]; //hack
 			int interesting = 0; //has_value(objects[i][1], "Char_Player");
 			if (interesting) write("INTERESTING: %O\n", objects[i]);
 			//if (!seen[objects[i][1]]) {write("OBJECT %O\n", (objects[i][1] / ".")[-1] - "\0"); seen[objects[i][1]] = 1;}
 			if (objects[i][0]) {
 				//Actor
-				[string parlvl, string parpath, int components] = data->sscanf("%-4H%-4H%-4c");
-				while (components--) {
-					[string complvl, string comppath] = data->sscanf("%-4H%-4H");
-					if (interesting) write("Component %O %O\n", complvl, comppath);
-				}
+				[obj->parlvl, obj->parpath, int components] = data->sscanf("%-4H%-4H%-4c");
+				obj->components = ({ });
+				while (components--) obj->components += ({data->sscanf("%-4H%-4H")});
 			} else {
 				//Object. Nothing interesting here.
 			}
 			//Properties. If chain, expect more meaningful data after the None - otherwise, everything up to the end marker will be discarded.
 			mapping parse_properties(int end, int(1bit) chain, string path) {
 				mapping ret = ([]);
-				//write("RAW PROPERTIES %O\n", ((string)data)[..sizeof(data) - end - 1]);
+				ret->_raw = ((string)data)[..sizeof(data) - end - 1]; //HACK
 				while (sizeof(data) > end) {
 					[string prop] = data->sscanf("%-4H");
 					if (prop == "None\0") break; //There MAY still be a type after that, but it won't be relevant. If there is, it'll be skipped in the END part.
@@ -251,13 +248,11 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 					}
 					if (sz) data->read(sz);
 				}
-				if (!chain && sizeof(data) > end) {
-					string rest = data->read(sizeof(data) - end);
-					//if (rest != "\0" * sizeof(rest)) write("REST %O\n", rest);
-				}
+				if (!chain && sizeof(data) > end)
+					ret->_residue = data->read(sizeof(data) - end);
 				return ret;
 			}
-			mapping prop = parse_properties(propend, 0, objects[i][1] - "\0");
+			mapping prop = obj->prop = parse_properties(propend, 0, objects[i][1] - "\0");
 			if (interesting) write("Properties %O\n", prop);
 			if (has_value(objects[i][1], "Pickup_Spawnable")) {
 				string id = (replace(prop["mPickupItems\0"][?"Item\0"] || "", "\0", "") / ".")[-1];
@@ -462,6 +457,11 @@ void annotate_autocrop(mapping savefile, Image.Image annot_map) {
 	return savefile;
 }
 
+void encode_properties(Stdio.Buffer dest, mapping props) {
+	if (props->_raw) {dest->add(props->_raw); return;}
+	if (props->_residue) dest->add(props->_residue);
+}
+
 //Reconstruct the main body of a savefile (which gets compressed in chunks for actual serialization)
 //The tree will be cached_parse_savefile(...)->tree->savefilebody but may have been mutated.
 string reconstitute_savefile_body(mapping tree) {
@@ -496,8 +496,11 @@ string reconstitute_savefile_body(mapping tree) {
 		foreach (sublevel->objects, array o) {
 			mapping obj = o[-1];
 			level->sprintf("%-4c%-4c", obj->ver, obj->flg);
-			//hack
-			level->sprintf("%-4H", obj->rawbytes);
+			//All the rest of the object's information - possibly including trailing bytes - gets its length stored.
+			Stdio.Buffer objbytes = Stdio.Buffer();
+			if (o[0]) objbytes->sprintf("%-4H%-4H%-4c%{%-4H%-4H%}", obj->parlvl, obj->parpath, sizeof(obj->components), obj->components);
+			encode_properties(objbytes, obj->prop);
+			level->sprintf("%-4H", (string)objbytes);
 		}
 		if (sublevel->post_objects_bytes) level->add(sublevel->post_objects_bytes);
 		data->sprintf("%-8H", (string)level);
