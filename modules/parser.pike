@@ -58,20 +58,22 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 		decomp += gz->inflate((string)data);
 		data = Stdio.Buffer(gz->end_of_stream()); data->read_only();
 	}
-	tree->savefilebody = decomp; //Hack - not yet treeifying the body
 	//Alright. Now that we've unpacked all the REAL data, let's get to parsing.
 	//Stdio.write_file("dump", decomp); Process.create_process(({"hd", "dump"}), (["stdout": Stdio.File("dump.hex", "wct")]));
 	data = Stdio.Buffer(decomp); data->read_only();
 	[int sz] = data->sscanf("%-8c"); //Total size (will be equal to sizeof(data) after this returns)
+	tree = tree->savefilebody = ([]);
 	//Most of these are fixed and have unknown purpose
-	[int unk10, string unk11, int zero3, int unk12, int unk13, string unk14, int unk15] = data->sscanf("%-4c%-4H%-4c%-4c%-4c%-4H%-4c");
+	[int unk10, string unk11, int zero3, tree->hdr1, int unk13, string unk14, tree->hdr2] = data->sscanf("%-4c%-4H%-4c%-4c%-4c%-4H%-4c");
+	//Level-grouping grids
 	for (int i = 0; i < 5; ++i) {
 		[string title, int unk17, int unk18, int n] = data->sscanf("%-4H%-4c%-4c%-4c");
 		//write("Next section: %d %O (%x/%x)\n", n, title, unk17, unk18);
-		while (n--) {
-			[string unk19, int unk20] = data->sscanf("%-4H%-4c");
-		}
+		array info = ({ });
+		while (n--) info += ({data->sscanf("%-4H%-4c")});
+		tree->levelgroupinggrids += ({({title, unk17, unk18, info})});
 	}
+	tree->rest = (string)data;
 	[int sublevelcount] = data->sscanf("%-4c");
 	//write("Sublevels: %d\n", sublevelcount);
 	multiset seen = (<>);
@@ -458,14 +460,27 @@ void annotate_autocrop(mapping savefile, Image.Image annot_map) {
 	return savefile;
 }
 
+//Reconstruct the main body of a savefile (which gets compressed in chunks for actual serialization)
+//The tree will be cached_parse_savefile(...)->tree->savefilebody but may have been mutated.
+string reconstitute_savefile_body(mapping tree) {
+	Stdio.Buffer data = Stdio.Buffer();
+	data->sprintf("%-4c%-4H%-4c%-4c%-4c%-4H%-4c", 6, "None\0", 0, tree->hdr1, 1, "None\0", tree->hdr2);
+	foreach (tree->levelgroupinggrids, [string title, int unk17, int unk18, array info]) {
+		data->sprintf("%-4H%-4c%-4c%-4c%{%-4H%-4c%}", title, unk17, unk18, sizeof(info), info);
+	}
+	data->add(tree->rest);
+	return sprintf("%-8H", (string)data);
+}
+
 //Reconstruct a savefile based on the parse tree. This will be cached_parse_savefile(...)->tree
 //but may have been mutated in between.
 @export: string reconstitute_savefile(mapping tree) {
 	//Step 1: Build the savefile body
-	string body = tree->savefilebody;
+	string body = reconstitute_savefile_body(tree->savefilebody);
 	Stdio.Buffer data = Stdio.Buffer();
 	data->sprintf("%-4c%-4c%-4c%-4H%-4H%-4H%-4c", @tree->header);
 	data->sprintf("%-8c%c%-4c%-4H%-4c%-4H%24s%-4c", @tree->header2);
+	//The body gets its own size prepended to it, then gets deflated in 128k chunks.
 	foreach (body / 131072.0, string chunk) {
 		string defl = Gz.compress(chunk);
 		data->sprintf("%-8c%-4c%-4c%c%-8c%-8c%[4]-8c%[5]-8c",
