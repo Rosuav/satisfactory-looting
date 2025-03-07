@@ -128,6 +128,19 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 			mapping parse_properties(int end, int(1bit) chain, string path) {
 				mapping ret = ([]);
 				ret->_raw = ((string)data)[..sizeof(data) - end - 1]; //HACK
+				/* Next plans
+				Rework the props result mapping (here "ret") to have a properly-cooked version,
+				and a typed version intended for manipulation and re-export. The cooked version
+				will not have the trailing nulls, will have only the interesting parts, and in
+				fact, may not need to exist for all properties - only the ones we actually use.
+				The typed version will always have a mapping for every property, starting with
+				the property's Type.
+
+				1. Build the typed and cooked versions. Or just build the typed version, and
+				   rework everything to use that instead of the current hybrid.
+				2. Reconstitute the typed version into the savefile (below)
+				3. Provide helpers for manipulating the property list and/or object list.
+				*/
 				while (sizeof(data) > end) {
 					[string prop] = data->sscanf("%-4H");
 					if (prop == "None\0") break; //There MAY still be a type after that, but it won't be relevant. If there is, it'll be skipped in the END part.
