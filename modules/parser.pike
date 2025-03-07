@@ -29,25 +29,28 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 	//Huh. Unlike the vast majority of games out there, Satisfactory has info on its official wiki.
 	//https://satisfactory.wiki.gg/wiki/Save_files
 	//mapname is always "Persistent_Level"; sessname is what the user entered to describe the session.
-	[int ver1, int ver2, int build, string mapname, string params, string sessname, int playtime] = data->sscanf("%-4c%-4c%-4c%-4H%-4H%-4H%-4c");
+	mapping tree = ret->tree = ([]); //Everything needed to reconstruct the original savefile.
+	[int ver1, int ver2, int build, string mapname, string params, string sessname, int playtime] = tree->header = data->sscanf("%-4c%-4c%-4c%-4H%-4H%-4H%-4c");
 	if (ver1 < 13) return ret; //There seem to be some differences with really really old savefiles
 	ret->session = sessname[..<1];
+	//[int timestamp, int visibility, int objver, string modmeta, int modflags, string sessid, string persistent, int cheats]
 	//visibility is "private", "friends only", etc. Not sure what the byte values are.
 	//I've no idea what the session ID is at this point but it seems to stay constant for one session. It's always 22 bytes (plus the null).
-	[int timestamp, int visibility, int objver, string modmeta, int modflags, string sessid] = data->sscanf("%-8c%c%-4c%-4H%-4c%-4H");
-	data->read(24); //A bunch of uninteresting numbers. Possibly includes an RNG seed?
-	[int cheats] = data->sscanf("%-4c"); //?? Whether AGSes are used?
+	//The persistent information is mostly uninteresting, but is always constant for any given session (possibly RNG seed).
+	//The cheats flag is 1 if AGSes are used, 0 if not (? unconfirmed)
+	tree->header2 = data->sscanf("%-8c%c%-4c%-4H%-4c%-4H%24s%-4c");
 	//The rest of the file is a series of compressed chunks. Each blob of deflated data has a
 	//header prepended which is 49 bytes long.
 	string decomp = "";
 	while (sizeof(data)) {
-		//Chunk header is a fixed eight byte string
-		//Oddly, the inflated size is always 131072, even on the last chunk, which has whatever's left.
+		//Chunk header is a fixed eight byte value 0x222222229e2a83c1 (Unreal signature)
+		//The maximum size is always 131072, even on the last chunk, which has whatever's left.
+		//The actual size is given by the inflsz afterwards. Oddly, the deflated and inflated sizes are
+		//each stored twice.
 		//A lot of this is guesses, esp since most of this seems to be fixed format (eg type is always 3,
-		//but I'm guessing that's a one-byte marker saying "gzipped"). In the last 24 bytes, there seem
-		//to be more copies of the same information, no idea why.
-		//werror("%O\n", ((string)data)[..20]);
-		[string chunkhdr, int inflsz, int zero1, int type, int deflsz, int zero2, string unk9] = data->sscanf("%8s%-4c%-4c%c%-4c%-4c%24s");
+		//but I'm guessing that's a one-byte marker saying "gzipped").
+		//[int chunkhdr, int maxsz, int zero, int type, int deflsz, int inflsz, int deflsz2, int inflsz2]
+		array chunk = data->sscanf("%-8c%-4c%-4c%c%-8c%-8c%-8c%-8c");
 		//????? For some reason, Pike segfaults if we don't first probe the buffer like this.
 		//So don't remove this 'raw =' line even if raw itself isn't needed.
 		string raw = (string)data;
@@ -55,6 +58,7 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 		decomp += gz->inflate((string)data);
 		data = Stdio.Buffer(gz->end_of_stream()); data->read_only();
 	}
+	tree->savefilebody = decomp; //Hack - not yet treeifying the body
 	//Alright. Now that we've unpacked all the REAL data, let's get to parsing.
 	//Stdio.write_file("dump", decomp); Process.create_process(({"hd", "dump"}), (["stdout": Stdio.File("dump.hex", "wct")]));
 	data = Stdio.Buffer(decomp); data->read_only();
@@ -452,4 +456,22 @@ void annotate_autocrop(mapping savefile, Image.Image annot_map) {
 		func(savefile, savefile->annot_map, @anno[1..]);
 	}
 	return savefile;
+}
+
+//Reconstruct a savefile based on the parse tree. This will be cached_parse_savefile(...)->tree
+//but may have been mutated in between.
+@export: string reconstitute_savefile(mapping tree) {
+	//Step 1: Build the savefile body
+	string body = tree->savefilebody;
+	Stdio.Buffer data = Stdio.Buffer();
+	data->sprintf("%-4c%-4c%-4c%-4H%-4H%-4H%-4c", @tree->header);
+	data->sprintf("%-8c%c%-4c%-4H%-4c%-4H%24s%-4c", @tree->header2);
+	foreach (body / 131072.0, string chunk) {
+		string defl = Gz.compress(chunk);
+		data->sprintf("%-8c%-4c%-4c%c%-8c%-8c%[4]-8c%[5]-8c",
+			0x222222229e2a83c1, //Magic header
+			131072, 0, 3, sizeof(defl), sizeof(chunk));
+		data->add(defl);
+	}
+	return (string)data;
 }
