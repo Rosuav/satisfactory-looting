@@ -73,18 +73,20 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 		while (n--) info += ({data->sscanf("%-4H%-4c")});
 		tree->levelgroupinggrids += ({({title, unk17, unk18, info})});
 	}
-	tree->rest = (string)data;
+	tree->sublevels = ({ });
 	[int sublevelcount] = data->sscanf("%-4c");
 	//write("Sublevels: %d\n", sublevelcount);
 	multiset seen = (<>);
 	ret->crashsites = ({ }); ret->loot = ({ }); ret->visited_areas = ({ });
 	ret->spawners = ({ }); ret->mapmarkers = ({ }); ret->players = ({ }); ret->pois = ({ });
 	while (sublevelcount-- > -1) {
+		mapping sublevel = ([]); tree->sublevels += ({sublevel});
 		int pos = sizeof(decomp) - sizeof(data);
 		//The persistent level (one past the sublevel count) has no name field.
-		[string lvlname, int sz, int count] = data->sscanf(sublevelcount < 0 ? "%0s%-8c%-4c" : "%-4H%-8c%-4c");
+		if (sublevelcount >= 0) sublevel->lvlname = data->sscanf("%-4H")[0];
+		[int sz, int count] = data->sscanf("%-8c%-4c");
 		int endpoint = sizeof(data) + 4 - sz; //The size includes the count, so adjust our position accordingly
-		//write("[%X] Level %O size %d count %d\n", pos, lvlname, sz, count);
+		//write("[%X] Level %O size %d count %d\n", pos, sublevel->lvlname, sz, count);
 		array objects = ({});
 		while (count--) {
 			//objtype, class, level, prop
@@ -98,19 +100,20 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 			}
 			objects += ({obj});
 		}
+		sublevel->objects = objects;
 		[int coll] = data->sscanf("%-4c");
-		while (coll--) {
-			[string lvl, string path] = data->sscanf("%-4H%-4H");
-			//write("Collectable: %O\n", path);
-		}
+		sublevel->collectables = ({ });
+		while (coll--) sublevel->collectables += ({data->sscanf("%-4H%-4H")});
 		//Not sure what extra bytes there might be. Also, what if we're already past this point?
-		if (sizeof(data) > endpoint) data->read(sizeof(data) - endpoint);
+		if (sizeof(data) > endpoint) sublevel->post_collectables_bytes = data->read(sizeof(data) - endpoint);
 		[int entsz, int nument] = data->sscanf("%-8c%-4c");
 		endpoint = sizeof(data) + 4 - entsz;
 		//Note that nument ought to be the same as the object count (and therefore sizeof(objects)) from above
 		for (int i = 0; i < sizeof(objects) && i < nument; ++i) {
-			[int ver, int flg, int sz] = data->sscanf("%-4c%-4c%-4c");
+			mapping obj = ([]); objects[i] += ({obj});
+			[obj->ver, obj->flg, int sz] = data->sscanf("%-4c%-4c%-4c");
 			int propend = sizeof(data) - sz;
+			obj->rawbytes = ((string)data)[..sz-1]; //hack
 			int interesting = 0; //has_value(objects[i][1], "Char_Player");
 			if (interesting) write("INTERESTING: %O\n", objects[i]);
 			//if (!seen[objects[i][1]]) {write("OBJECT %O\n", (objects[i][1] / ".")[-1] - "\0"); seen[objects[i][1]] = 1;}
@@ -284,18 +287,17 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 			])[objects[i][1]])
 				ret->pois += ({({label, objects[i][9..11], prop})});
 		}
-		if (sizeof(data) > endpoint) data->read(sizeof(data) - endpoint);
+		if (sizeof(data) > endpoint) data->post_objects_bytes = data->read(sizeof(data) - endpoint);
 		[int collected] = data->sscanf("%-4c");
-		while (collected--) {
-			[string lvl, string path] = data->sscanf("%-4H%-4H");
-			//write("Collected %O\n", path);
-		}
+		sublevel->collecteds = ({ });
+		while (collected--) sublevel->collecteds += ({data->sscanf("%-4H%-4H")});
 	}
 	//The wiki says there's a 32-bit zero before this count, but I don't see it.
 	//It's also possible that this refcnt isn't even here. Presumably no refs??
 	if (sizeof(data)) {
+		tree->references = ({ });
 		[int refcnt] = data->sscanf("%-4c");
-		while (refcnt--) data->sscanf("%-4H%-4H");
+		while (refcnt--) tree->references += ({data->sscanf("%-4H%-4H")});
 	}
 	if (sizeof(data)) write("[%X] Remaining: %d %O\n\n", sizeof(decomp) - sizeof(data), sizeof(data), data->read(128));
 
@@ -468,7 +470,42 @@ string reconstitute_savefile_body(mapping tree) {
 	foreach (tree->levelgroupinggrids, [string title, int unk17, int unk18, array info]) {
 		data->sprintf("%-4H%-4c%-4c%-4c%{%-4H%-4c%}", title, unk17, unk18, sizeof(info), info);
 	}
-	data->add(tree->rest);
+	data->sprintf("%-4c", sizeof(tree->sublevels) - 1); //Note that our array of sublevels includes the persistent level
+	foreach (tree->sublevels; int i; mapping sublevel) {
+		if (sublevel->lvlname) data->sprintf("%-4H", sublevel->lvlname); //Absent on the persistent level
+		Stdio.Buffer level = Stdio.Buffer();
+		//Object headers
+		level->sprintf("%-4c", sizeof(sublevel->objects));
+		foreach (sublevel->objects, array obj) {
+			if (obj[0]) {
+				//Actor
+				level->sprintf("%-4c%-4H%-4H%-4H%-4c%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4c", @obj[..<0]); //Transform (rotation/translation/scale)
+			} else {
+				//Object/component
+				level->sprintf("%-4c%-4H%-4H%-4H%-4H", @obj[..<0]);
+			}
+		}
+		//Collectables
+		level->sprintf("%-4c%{%-4H%-4H%}", sizeof(sublevel->collectables), sublevel->collectables);
+		//Still not sure what these might be, if any.
+		if (sublevel->post_collectables_bytes) level->add(sublevel->post_collectables_bytes);
+		data->sprintf("%-8H", (string)level);
+		level = Stdio.Buffer();
+		//Objects
+		level->sprintf("%-4c", sizeof(sublevel->objects)); //Should always match the number of headers
+		foreach (sublevel->objects, array o) {
+			mapping obj = o[-1];
+			level->sprintf("%-4c%-4c", obj->ver, obj->flg);
+			//hack
+			level->sprintf("%-4H", obj->rawbytes);
+		}
+		if (sublevel->post_objects_bytes) level->add(sublevel->post_objects_bytes);
+		data->sprintf("%-8H", (string)level);
+		//Note that collectables are *included* in the headers size, but collecteds are *excluded* from the objects size.
+		//We're still better than Adobe formats though.
+		data->sprintf("%-4c%{%-4H%-4H%}", sizeof(sublevel->collecteds), sublevel->collecteds);
+	}
+	if (tree->references) data->sprintf("%-4c%{%-4H%-4H%}", sizeof(tree->references), tree->references);
 	return sprintf("%-8H", (string)data);
 }
 
