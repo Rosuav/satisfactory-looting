@@ -8,6 +8,14 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 	return has_value(get_dir(SATIS_SAVE_PATH), fn);
 }
 
+class ObjectRef(string level, string path) {
+	constant _is_object_ref = 1;
+	protected void create() {
+		level -= "\0"; path -= "\0";
+	}
+	protected string _sprintf(int type) {return (type == 's' || type == 'O') && sprintf("ObjectRef(%O, %O)", level, path);}
+}
+
 @export: mapping cached_parse_savefile(string fn) {
 	//NOTE: This does not validate the file name by ensuring that it is found in the directory.
 	//If the file name comes from an untrusted source, first call check_savefile_name() above.
@@ -77,7 +85,7 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 	[int sublevelcount] = data->sscanf("%-4c");
 	//write("Sublevels: %d\n", sublevelcount);
 	multiset seen = (<>);
-	ret->crashsites = ({ }); ret->loot = ({ }); ret->visited_areas = ({ });
+	ret->crashsites = ({ }); ret->loot = ({ });
 	ret->spawners = ({ }); ret->mapmarkers = ({ }); ret->players = ({ }); ret->pois = ({ });
 	while (sublevelcount-- > -1) {
 		mapping sublevel = ([]); tree->sublevels += ({sublevel});
@@ -148,33 +156,37 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 					//if (prop == "mVisitedAreas\0") write("*** FOUND %O --> %O\n", path, prop);
 					[string type] = data->sscanf("%-4H");
 					if (interesting) write("[%s] Prop %O %O\n", path, prop, type);
-					[int sz, int idx] = data->sscanf("%-4c%-4c");
+					mapping p = ret[prop - "\0"] = (["type": type - "\0"]);
+					[int sz, p->idx] = data->sscanf("%-4c%-4c");
+					int end;
 					if (type == "BoolProperty\0") {
 						//Special-case: Doesn't have a type string, has the value in there instead
-						[ret[prop], int zero] = data->sscanf("%c%c");
-					} else if (prop == "mFogOfWarRawData\0") { data->sscanf("%-4H%c"); //HACK - Don't dump the FOW to the console
+						[p->value, int zero] = data->sscanf("%c%c");
 					} else if ((<"ArrayProperty\0", "SetProperty\0">)[type]) {
 						//Complex types have a single type
-						[string type, int zero] = data->sscanf("%-4H%c");
-						if (type == "None\0") {data->read(sz); sz = 0; continue;} //Empty array???
-						int end = sizeof(data) - sz;
+						[p->subtype, int zero] = data->sscanf("%-4H%c");
+						//Empty array??? Unconfirmed. May have been only due to a prior bug.
+						if (p->subtype == "None\0") {write("None type in %O %O", type, path); data->read(sz); sz = 0; continue;}
+						p->subtype -= "\0";
+						end = sizeof(data) - sz;
 						[int elements] = data->sscanf("%-4c");
 						array arr = ({ });
-						if (interesting) write("Subtype %O, %d elem\n", type, elements);
+						if (interesting) write("Subtype %O, %d elem\n", p->subtype, elements);
 						while (elements--) {
-							switch (type) {
-								case "ObjectProperty\0": arr += ({(data->sscanf("%-4H%-4H")[*] - "\0") * " :: "}); break;
-								case "StructProperty\0": {
+							switch (p->subtype) {
+								case "ObjectProperty": arr += ({ObjectRef(@data->sscanf("%-4H%-4H"))}); break;
+								case "StructProperty": {
 									//if (interesting) {write("Array of struct %O\n", data->read(sizeof(data) - end)); break;}
 									mapping struct = ([]);
 									if (sizeof(arr)) struct->_type = arr[0]->_type;
 									else {
 										data->sscanf("%-4H%-4H%-8c"); //Uninteresting - mostly repeated info from elsewhere
 										[struct->_type, int zero] = data->sscanf("%-4H%17c");
+										struct->_type -= "\0";
 									}
 									//struct->_raw = ((string)data)[..sizeof(data) - end - 1];
 									switch (struct->_type) {
-										case "SpawnData\0": case "MapMarker\0": //A lot will be property lists
+										case "SpawnData": case "MapMarker": //A lot will be property lists
 											struct |= parse_properties(end, 1, path + " --> " + prop - "\0");
 											break;
 										default: break; //Unknown - just skip to the next one
@@ -182,84 +194,78 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 									arr += ({struct});
 									break;
 								}
-								case "ByteProperty\0": arr += data->sscanf("%c"); break;
-								default: if (interesting) write("UNKNOWN ARRAY SUBTYPE %O [%d]\n", type, elements + 1); break;
+								case "ByteProperty": arr += data->sscanf("%c"); break;
+								default: if (interesting) write("UNKNOWN ARRAY SUBTYPE %O [%d]\n", p->subtype, elements + 1); break;
 							}
 						}
 						sz = sizeof(data) - end;
-						ret[prop] = arr;
+						p->value = arr;
 					} else if (type == "ByteProperty\0") {
-						[string type, int zero, ret[prop]] = data->sscanf("%-4H%c%c");
+						[p->subtype, int zero, p->value] = data->sscanf("%-4H%c%c");
+						p->subtype -= "\0";
 						--sz;
 					} else if (type == "EnumProperty\0") {
-						[string type, int zero] = data->sscanf("%-4H%c");
-						int end = sizeof(data) - sz;
-						[ret[prop]] = data->sscanf("%-4H");
-						sz = sizeof(data) - end;
+						[p->subtype, int zero] = data->sscanf("%-4H%c");
+						p->subtype -= "\0";
+						end = sizeof(data) - sz;
+						p->value = data->sscanf("%-4H")[0] - "\0";
 					} else if (type == "MapProperty\0") {
 						//Mapping types have two types (key and value)
-						[string keytype, string valtype, int zero] = data->sscanf("%-4H%-4H%c");
+						[p->keytype, p->valtype, int zero] = data->sscanf("%-4H%-4H%c");
 					} else if (type == "StructProperty\0") {
 						//Struct types have more padding
-						[string type, int zero] = data->sscanf("%-4H%17c");
+						[p->subtype, int zero] = data->sscanf("%-4H%17c");
+						p->subtype -= "\0";
 						if (interesting) write("Type %O\n", type);
-						int end = sizeof(data) - sz;
-						switch (type) {
-							case "InventoryStack\0": case "Vector_NetQuantize\0": {
+						end = sizeof(data) - sz;
+						switch (p->subtype) {
+							case "InventoryStack": case "Vector_NetQuantize": {
 								//The stack itself is a property list. But a StructProperty inside it has less padding??
 								//write("RAW INVENTORY %O\n", ((string)data)[..sizeof(data) - end - 1]);
-								ret[prop] = parse_properties(end, 0, path + " --> " + prop - "\0");
+								p->value = parse_properties(end, 0, path + " --> " + prop - "\0");
 								break;
 							}
-							case "InventoryItem\0": {
-								[int padding, ret[prop], int unk] = data->sscanf("%-4c%-4H%-4c");
+							case "InventoryItem": {
+								[int padding, p->value, p->unk] = data->sscanf("%-4c%-4H%-4c");
 								break;
 							}
-							case "LinearColor\0": {
-								ret[prop] = data->sscanf("%-4F%-4F%-4F%-4F");
+							case "LinearColor": {
+								p->value = data->sscanf("%-4F%-4F%-4F%-4F");
 								break;
 							}
-							case "Vector\0": {
+							case "Vector": {
 								//The wiki says these are floats, but the size seems to be 24,
 								//which is enough for three doubles. Is the size always the same?
 								//Note also that mLastSafeGroundPositions seems to be repeated.
 								//Is it necessary to combine into an array??
-								ret[prop] = data->sscanf("%-8F%-8F%-8F");
+								p->value = data->sscanf("%-8F%-8F%-8F");
 								break;
 							}
 							default: break;
 						}
 						sz = sizeof(data) - end;
 					} else if (type == "IntProperty\0") {
-						[int zero, ret[prop]] = data->sscanf("%c%-4c");
+						[int zero, p->value] = data->sscanf("%c%-4c");
 						sz -= 4;
 					} else if (type == "FloatProperty\0") {
-						[int zero, ret[prop]] = data->sscanf("%c%-4F");
+						[int zero, p->value] = data->sscanf("%c%-4F");
 						sz -= 4;
 					} else if (type == "DoubleProperty\0") {
-						[int zero, ret[prop]] = data->sscanf("%c%-8F");
+						[int zero, p->value] = data->sscanf("%c%-8F");
 						sz -= 8;
 					} else if (type == "StrProperty\0") {
-						if (sz == 4) {
-							//If the string is empty, the padding byte seems to be
-							//missing, so there's just four bytes of zeroes, not five.
-							ret[prop] = "";
-							data->read(1);
-						} else {
-							int end = sizeof(data) - sz - 1;
-							[int zero, ret[prop]] = data->sscanf("%c%-4H");
-							sz = sizeof(data) - end;
-						}
+						end = sizeof(data) - sz - 1;
+						[int zero, p->value] = data->sscanf("%c%-4H");
+						p->value -= "\0";
 					} else if (type == "ObjectProperty\0") {
-						int end = sizeof(data) - sz - 1;
-						[int zero, string lvl, string path] = data->sscanf("%c%-4H%-4H");
-						ret[prop] = lvl + " :: " + path;
-						sz = sizeof(data) - end;
+						end = sizeof(data) - sz - 1;
+						p->value = ObjectRef(@data->sscanf("%*c%-4H%-4H"));
 					} else {
 						//Primitive types have no type notation
 						[int zero] = data->sscanf("%c");
 					}
-					if (sz) data->read(sz);
+					if (end) sz = sizeof(data) - end;
+					if (sz) p->residue = data->read(sz);
 				}
 				if (!chain && sizeof(data) > end)
 					ret->_residue = data->read(sizeof(data) - end);
@@ -268,25 +274,18 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 			mapping prop = obj->prop = parse_properties(propend, 0, objects[i][1] - "\0");
 			if (interesting) write("Properties %O\n", prop);
 			if (has_value(objects[i][1], "Pickup_Spawnable")) {
-				string id = (replace(prop["mPickupItems\0"][?"Item\0"] || "", "\0", "") / ".")[-1];
-				int num = prop["mPickupItems\0"][?"NumItems\0"];
-				ret->loot += ({({id, num, objects[i][9..11]})});
-				//write("Spawnable: (%.0f,%.0f,%.0f) %d of %s\n", objects[i][9], objects[i][10], objects[i][11], num, id);
+				string id = (replace(prop->mPickupItems->value->Item->value, "\0", "") / ".")[-1];
+				ret->loot += ({({id, prop->mPickupItems->value->NumItems->value, objects[i][9..11]})});
 			}
-			if (has_value(objects[i][1], "PlayerState") && prop["mVisitedAreas\0"]) {
-				//write("Have visited: %O\n", prop["mVisitedAreas\0"]);
-				ret->visited_areas = prop["mVisitedAreas\0"][*] - "\0";
-			}
-			if (has_value(objects[i][1], "FGMapManager") && prop["mMapMarkers\0"]) {
-				//write("Map markers: %O\n", prop["mMapMarkers\0"]);
-				ret->mapmarkers = prop["mMapMarkers\0"];
+			if (has_value(objects[i][1], "FGMapManager") && prop->mMapMarkers) {
+				ret->mapmarkers = prop->mMapMarkers->value;
 			}
 			if (objects[i][1] == "/Game/FactoryGame/World/Benefit/DropPod/BP_DropPod.BP_DropPod_C\0")
 				ret->crashsites += ({({(objects[i][3] / ".")[-1], objects[i][9..11]})});
 			if (objects[i][1] == "/Game/FactoryGame/Character/Creature/BP_CreatureSpawner.BP_CreatureSpawner_C\0")
 				ret->spawners += ({({(objects[i][3] / ".")[-1], objects[i][9..11], prop["mSpawnData\0"]})});
 			if (objects[i][1] == "/Game/FactoryGame/Character/Player/Char_Player.Char_Player_C\0")
-				ret->players += ({({prop["mCachedPlayerName\0"] - "\0", objects[i][9..11], prop})});
+				ret->players += ({({prop->mCachedPlayerName->value - "\0", objects[i][9..11], prop})});
 			if (string label = ([
 				"/Game/FactoryGame/Buildable/Factory/SpaceElevator/Build_SpaceElevator.Build_SpaceElevator_C\0": "Space El",
 				"/Game/FactoryGame/Buildable/Factory/TradingPost/Build_TradingPost.Build_TradingPost_C\0": "HUB",
@@ -351,23 +350,19 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 		//NOTE: A marker with MarkerID\0 of 255 seems possibly to have been deleted??
 		//It's like the slot is left in the array but the marker is simply not shown.
 		//We suppress those from our array, as they are uninteresting.
-		if (mark["MarkerID\0"] == 255) continue;
+		if (mark->MarkerID->value == 255) continue;
 		//Would be nice to show if the marker is highlighted. This info may actually be
 		//stored the other way around - a flag on the player saying "highlight this marker".
-		markers += ({([
-			"MarkerID": mark["MarkerID\0"],
-			"CategoryName": mark["CategoryName\0"] - "\0",
-			"Color": mark["Color\0"],
-			"IconID": mark["IconID\0"],
-			"Name": mark["Name\0"] - "\0",
-			"compassViewDistance": mark["compassViewDistance\0"] - "\0",
-			"Location": ({mark["Location\0"]["X\0"], mark["Location\0"]["Y\0"], mark["Location\0"]["Z\0"]}),
-		])});
+		mapping m = (["Location": ({
+			mark->Location->value->X->value,
+			mark->Location->value->Y->value,
+			mark->Location->value->Z->value,
+		})]);
+		foreach ("MarkerID CategoryName Color IconID Name compassViewDistance" / " ", string key)
+			m[key] = mark[key]->value;
+		markers += ({m});
 	}
 	ret->mapmarkers = markers;
-	//TODO: Locate key structures such as the HUB and Skyscar, providing their coordinates.
-	//They can then be used like map markers in the front end.
-
 	return ret;
 }
 
