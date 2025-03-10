@@ -609,6 +609,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 	if (props->_residue) dest->add(props->_residue);
 	if ((string)dest != props->_raw) {
 		string d = (string)dest, paired = String.common_prefix(({d, props->_raw}));
+		if (sizeof(d) > 1024) write("Encode failed for large [%d] object\n", sizeof(d)); else //Temporarily suppress the big ones
 		write("Encode %O\nResult: [%3d] %O\nOrigin: [%3d] %O\nPaired: [%3d] %O\n",
 			props, sizeof(dest), (string)dest, sizeof(props->_raw), props->_raw,
 			sizeof(paired), paired,
