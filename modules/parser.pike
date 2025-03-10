@@ -8,11 +8,13 @@ constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entrie
 	return has_value(get_dir(SATIS_SAVE_PATH), fn);
 }
 
-class ObjectRef(string level, string path) {
+class ObjectRef(string level, string path, int|void soft) {
 	constant _is_object_ref = 1;
 	protected void create() {
 		level -= "\0"; path -= "\0";
 	}
+	//Note that the "soft" part of a softobjectreference isn't reflected in the %O. If this
+	//becomes a problem, consider making SoftObjectRef a separate class.
 	protected string _sprintf(int type) {return (type == 's' || type == 'O') && sprintf("ObjectRef(%O, %O)", level, path);}
 }
 
@@ -157,9 +159,31 @@ class ObjectRef(string level, string path) {
 					//if (prop == "mVisitedAreas\0") write("*** FOUND %O --> %O\n", path, prop);
 					[string type] = data->sscanf("%-4H");
 					if (interesting) write("[%s] Prop %O %O\n", path, prop, type);
-					ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
-					mapping p = ret[prop - "\0"] = (["type": type - "\0"]);
+					mapping p = (["type": type - "\0"]);
 					[int sz, p->idx] = data->sscanf("%-4c%-4c");
+					if (p->idx) {
+						//Currently the ONLY attribute that uses this is mLastSafeGroundPositions
+						//There are three such positions stored, and they're simply duplicated.
+						//We wrap it up into another layer, ensuring that we keep everything.
+						//Note that this code won't trigger until we hit the second one of the
+						//arrayish, so the first one will already have been saved in the regular
+						//way. Note that we don't check that the index is actually increasing,
+						//just that it's nonzero on all but the first.
+						mapping prev = ret[prop - "\0"];
+						if (prev->type == "_repetition")
+							//It's a third or subsequent of the same thing.
+							prev->values += ({p});
+						else
+							//It's the second. Build the array.
+							ret[prop - "\0"] = ([
+								"type": "_repetition",
+								"values": ({prev, p}),
+							]);
+					}
+					else {
+						ret[prop - "\0"] = p;
+						ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
+					}
 					int end;
 					if (type == "BoolProperty\0") {
 						//Special-case: Doesn't have a type string, has the value in there instead
@@ -176,7 +200,9 @@ class ObjectRef(string level, string path) {
 						if (interesting) write("Subtype %O, %d elem\n", p->subtype, elements);
 						while (elements--) {
 							switch (p->subtype) {
+								case "InterfaceProperty": //Behaves basically the same as an ObjectRef. Should they be distinguished in any way?
 								case "ObjectProperty": arr += ({ObjectRef(@data->sscanf("%-4H%-4H"))}); break;
+								case "SoftObjectProperty": arr += ({ObjectRef(@data->sscanf("%-4H%-4H%-4c"))}); break;
 								case "StructProperty": {
 									//if (interesting) {write("Array of struct %O\n", data->read(sizeof(data) - end)); break;}
 									mapping struct = ([]);
@@ -197,7 +223,9 @@ class ObjectRef(string level, string path) {
 									break;
 								}
 								case "ByteProperty": arr += data->sscanf("%c"); break;
-								default: if (interesting) write("UNKNOWN ARRAY SUBTYPE %O [%d]\n", p->subtype, elements + 1); elements = 0; break;
+								case "IntProperty": arr += data->sscanf("%-4c"); break;
+								case "Int64Property": arr += data->sscanf("%-8c"); break;
+								default: if (!interesting) write("UNKNOWN ARRAY SUBTYPE %O [%d elem, %d bytes] %O\n", p->subtype, elements + 1, sizeof(data) - end, ((string)data)[..sizeof(data) - end - 1]); elements = 0; break;
 							}
 						}
 						sz = sizeof(data) - end;
@@ -238,8 +266,6 @@ class ObjectRef(string level, string path) {
 							case "Vector": {
 								//The wiki says these are floats, but the size seems to be 24,
 								//which is enough for three doubles. Is the size always the same?
-								//Note also that mLastSafeGroundPositions seems to be repeated.
-								//Is it necessary to combine into an array??
 								p->value = data->sscanf("%-8F%-8F%-8F");
 								break;
 							}
@@ -492,83 +518,92 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 	Stdio.Buffer dest = Stdio.Buffer();
 	//foreach (props; string name; mapping p) if (name[0] != '_') { //Simplify, don't require the key order to be specified
 	foreach (props->_keyorder, string name) {mapping p = props[name]; //Enforce output order for perfect round tripping
-		//TODO: What happens with prop->idx? It seems to be always zero?
-		dest->sprintf("%-4H%-4H", nt(name), nt(p->type));
-		object prop_size = buffer_size(dest, "%-4c");
-		dest->sprintf("%-4c", p->idx);
-		prop_size->ref += 5; //There should always be a padding byte.
-		//TODO: Everything that was resetting end or sz during parse_properties will need to update prop_size->ref
-		object struct_size;
-		switch (p->type) {
-			case "BoolProperty": dest->sprintf("%c%c", p->value, 0); break;
-			case "ArrayProperty": case "SetProperty": {
-				//Complex types have a single type
-				dest->sprintf("%-4H%c%-4c", nt(p->subtype), 0, sizeof(p->value));
-				prop_size->ref = sizeof(dest) - 4;
-				foreach (p->value; int i; mixed elem) switch (p->subtype) {
-					case "ObjectProperty": dest->sprintf("%-4H%-4H", nt(elem->level), nt(elem->path)); break;
-					case "StructProperty": {
-						if (!i) {
-							dest->sprintf("%-4H%-4H", nt(name), "StructProperty\0"); //Repeated info
-							struct_size = buffer_size(dest, "%-8c");
-							dest->sprintf("%-4H%17c", nt(elem->_type), 0);
-							struct_size->ref = sizeof(dest);
+		foreach (p->type == "_repetition" ? p->values : ({p}), mapping p) {
+			dest->sprintf("%-4H%-4H", nt(name), nt(p->type));
+			object prop_size = buffer_size(dest, "%-4c");
+			dest->sprintf("%-4c", p->idx);
+			prop_size->ref += 5; //There should always be a padding byte.
+			//TODO: Everything that was resetting end or sz during parse_properties will need to update prop_size->ref
+			object struct_size;
+			switch (p->type) {
+				case "BoolProperty": dest->sprintf("%c%c", p->value, 0); destruct(prop_size); break; //No size for these, leave it zero
+				case "ArrayProperty": case "SetProperty": {
+					//Complex types have a single type
+					dest->sprintf("%-4H%c%-4c", nt(p->subtype), 0, sizeof(p->value));
+					prop_size->ref = sizeof(dest) - 4;
+					foreach (p->value; int i; mixed elem) switch (p->subtype) {
+						case "InterfaceProperty": //See above, is basically same as ObjectProperty
+						case "ObjectProperty": dest->sprintf("%-4H%-4H", nt(elem->level), nt(elem->path)); break;
+						case "SoftObjectProperty": dest->sprintf("%-4H%-4H%-4c", nt(elem->level), nt(elem->path), elem->soft); break;
+						case "StructProperty": {
+							if (!i) {
+								dest->sprintf("%-4H%-4H", nt(name), "StructProperty\0"); //Repeated info
+								struct_size = buffer_size(dest, "%-8c");
+								dest->sprintf("%-4H%17c", nt(elem->_type), 0);
+								struct_size->ref = sizeof(dest);
+							}
+							switch (elem->_type) {
+								case "SpawnData": case "MapMarker": //A lot will be property lists
+									encode_properties(dest, elem);
+									break;
+								default: break; //Unknown - the content should all be in the residue
+							}
+							break;
 						}
-						switch (elem->_type) {
-							case "SpawnData": case "MapMarker": //A lot will be property lists
-								encode_properties(dest, elem);
-								break;
-							default: break; //Unknown - the content should all be in the residue
+						case "ByteProperty": dest->sprintf("%c", elem); break;
+						case "IntProperty": dest->sprintf("%-4c", elem); break;
+						case "Int64Property": dest->sprintf("%-8c", elem); break;
+						default: break;
+					}
+					break;
+				}
+				case "ByteProperty": dest->sprintf("%-4H%c%c", nt(p->subtype), 0, p->value); break;
+				case "EnumProperty":
+					dest->sprintf("%-4H%c", nt(p->subtype), 0);
+					prop_size->ref = sizeof(dest);
+					dest->sprintf("%-4H", nt(p->value));
+					break;
+				case "MapProperty": dest->sprintf("%-4H%-4H%c", p->keytype, p->valtype, 0); break; //The actual mapping will be in residue
+				case "StructProperty": {
+					//Struct types have more padding
+					dest->sprintf("%-4H%17c", nt(p->subtype), 0);
+					prop_size->ref = sizeof(dest);
+					switch (p->subtype) {
+						case "InventoryStack": case "Vector_NetQuantize": {
+							encode_properties(dest, p->value);
+							break;
 						}
-						break;
+						case "InventoryItem": {
+							dest->sprintf("%-4c%-4H%-4c", 0, p->value, p->unk);
+							break;
+						}
+						case "LinearColor": {
+							dest->sprintf("%-4F%-4F%-4F%-4F", @p->value);
+							break;
+						}
+						case "Vector": {
+							//The wiki says these are floats, but the size seems to be 24,
+							//which is enough for three doubles. Is the size always the same?
+							//Note also that mLastSafeGroundPositions seems to be repeated.
+							//Is it necessary to combine into an array??
+							dest->sprintf("%-8F%-8F%-8F", @p->value);
+							break;
+						}
+						default: break;
 					}
-					case "ByteProperty": dest->sprintf("%c", elem); break;
-					default: break;
+					break;
 				}
-				break;
+				case "IntProperty": dest->sprintf("%c%-4c", 0, p->value); break;
+				case "FloatProperty": dest->sprintf("%c%-4F", 0, p->value); break;
+				case "DoubleProperty": dest->sprintf("%c%-8F", 0, p->value); break;
+				case "StrProperty": dest->sprintf("%c%-4H", 0, nt(p->value)); break;
+				case "ObjectProperty": dest->sprintf("%c%-4H%-4H", 0, nt(p->value->level), nt(p->value->path)); break;
+				default: dest->add(0); break; //The rest (if any) will be in residue
 			}
-			case "ByteProperty": dest->sprintf("%-4H%c%c", nt(p->subtype), 0, p->value); break;
-			case "EnumProperty": dest->sprintf("%-4H%c%-4H", nt(p->subtype), 0, nt(p->value)); break;
-			case "MapProperty": dest->sprintf("%-4H%-4H%c", p->keytype, p->valtype, 0); break; //The actual mapping will be in residue
-			case "StructProperty": {
-				//Struct types have more padding
-				dest->sprintf("%-4H%17c", nt(p->subtype), 0);
-				prop_size->ref = sizeof(dest);
-				switch (p->subtype) {
-					case "InventoryStack": case "Vector_NetQuantize": {
-						encode_properties(dest, p->value);
-						break;
-					}
-					case "InventoryItem": {
-						dest->sprintf("%-4c%-4H%-4c", 0, p->value, p->unk);
-						break;
-					}
-					case "LinearColor": {
-						dest->sprintf("%-4F%-4F%-4F%-4F", @p->value);
-						break;
-					}
-					case "Vector": {
-						//The wiki says these are floats, but the size seems to be 24,
-						//which is enough for three doubles. Is the size always the same?
-						//Note also that mLastSafeGroundPositions seems to be repeated.
-						//Is it necessary to combine into an array??
-						dest->sprintf("%-8F%-8F%-8F", @p->value);
-						break;
-					}
-					default: break;
-				}
-				break;
-			}
-			case "IntProperty": dest->sprintf("%c%-4c", 0, p->value); break;
-			case "FloatProperty": dest->sprintf("%c%-4F", 0, p->value); break;
-			case "DoubleProperty": dest->sprintf("%c%-8F", 0, p->value); break;
-			case "StrProperty": dest->sprintf("%c%-4H", 0, nt(p->value)); break;
-			case "ObjectProperty": dest->sprintf("%c%-4H%-4H", 0, nt(p->value->level), nt(p->value->path)); break;
-			default: dest->add(0); break; //The rest (if any) will be in residue
+			if (p->residue) dest->add(p->residue);
+			if (prop_size) prop_size->apply(); //Normally the case, but it may have been destructed
+			if (struct_size) struct_size->apply();
 		}
-		if (p->residue) dest->add(p->residue);
-		prop_size->apply();
-		if (struct_size) struct_size->apply();
 	}
 	dest->sprintf("%-4H", "None\0"); //End marker. If it had a type originally, it'll be in _residue.
 	if (props->_residue) dest->add(props->_residue);
