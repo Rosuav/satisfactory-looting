@@ -14,6 +14,6 @@ void test() {
 	mapping save = parser->cached_parse_savefile("Assembly First_autosave_1.sav");
 	write("Got save %O\n", indices(save->tree));
 	string data = parser->reconstitute_savefile(save->tree);
-	Stdio.write_file(SATIS_SAVE_PATH + "/Reconstructed.sav", data);
+	//Stdio.write_file(SATIS_SAVE_PATH + "/Reconstructed.sav", data);
 	write("Reconstituted save has %d bytes\n", sizeof(data));
 }
