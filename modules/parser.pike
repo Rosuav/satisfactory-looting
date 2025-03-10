@@ -465,9 +465,118 @@ void annotate_autocrop(mapping savefile, Image.Image annot_map) {
 	return savefile;
 }
 
-void encode_properties(Stdio.Buffer dest, mapping props) {
-	if (props->_raw) {dest->add(props->_raw); return;}
+class buffer_size(Stdio.Buffer buf, strict_sprintf_format fmt) {
+	int pos, ref; //Position to store the size, and reference position to calculate it
+	protected void create() {
+		pos = sizeof(buf);
+		buf->sprintf(fmt, 0);
+		ref = sizeof(buf);
+	}
+	void apply() {
+		string sz = sprintf(fmt, sizeof(buf) - ref);
+		foreach (sz; int i; int c) buf[pos + i] = c;
+	}
+}
+
+//Null-terminate a string if necessary
+//Empty strings don't need them, and if it's already there, another won't be added.
+string nt(string val) {
+	if (val == "" || !val[-1]) return val;
+	return val + "\0";
+}
+
+void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
+	//if (props->_raw) {dest->add(props->_raw); return;}
+	Stdio.Buffer dest = Stdio.Buffer();
+	foreach (props; string name; mapping p) if (name[0] != '_') {
+		//TODO: What happens with prop->idx? It seems to be always zero?
+		dest->sprintf("%-4H%-4H", nt(name), nt(p->type));
+		object prop_size = buffer_size(dest, "%-4c");
+		dest->sprintf("%-4c", p->idx);
+		prop_size->ref += 5; //There should always be a padding byte.
+		//TODO: Everything that was resetting end or sz during parse_properties will need to update prop_size->ref
+		switch (p->type) {
+			case "BoolProperty": dest->sprintf("%c%c", p->value, 0); break;
+			case "ArrayProperty": case "SetProperty": {
+				//Complex types have a single type
+				dest->sprintf("%-4H%c%-4c", nt(p->subtype), 0, sizeof(p->value));
+				object struct_size;
+				foreach (p->value, mixed elem) switch (p->subtype) {
+					case "ObjectProperty": dest->sprintf("%-4H%-4H", nt(elem->level), nt(elem->path)); break;
+					case "StructProperty": {
+						if (sizeof(p->value)) elem->_type = p->value[0]->_type;
+						else {
+							dest->sprintf("%-4H%-4H", nt(name), "StructProperty\0"); //Repeated info
+							struct_size = buffer_size(dest, "%-8c");
+							dest->sprintf("%-4H%17c", nt(elem->_type), 0);
+						}
+						switch (elem->_type) {
+							case "SpawnData": case "MapMarker": //A lot will be property lists
+								encode_properties(dest, elem);
+								break;
+							default: break; //Unknown - the content should all be in the residue
+						}
+						break;
+					}
+					case "ByteProperty": dest->sprintf("%c", elem); break;
+					default: break;
+				}
+				if (struct_size) struct_size->apply();
+				break;
+			}
+			case "ByteProperty": dest->sprintf("%-4H%c%c", nt(p->subtype), 0, p->value); break;
+			case "EnumProperty": dest->sprintf("%-4H%c%-4H", nt(p->subtype), 0, nt(p->value)); break;
+			case "MapProperty": dest->sprintf("%-4H%-4H%c", p->keytype, p->valtype, 0); break; //The actual mapping will be in residue
+			case "StructProperty": break;
+					/*
+					} else if (type == "StructProperty\0") {
+						//Struct types have more padding
+						[p->subtype, int zero] = data->sscanf("%-4H%17c");
+						p->subtype -= "\0";
+						if (interesting) write("Type %O\n", type);
+						end = sizeof(data) - sz;
+						switch (p->subtype) {
+							case "InventoryStack": case "Vector_NetQuantize": {
+								//The stack itself is a property list. But a StructProperty inside it has less padding??
+								//write("RAW INVENTORY %O\n", ((string)data)[..sizeof(data) - end - 1]);
+								p->value = parse_properties(end, 0, path + " --> " + prop - "\0");
+								break;
+							}
+							case "InventoryItem": {
+								[int padding, p->value, p->unk] = data->sscanf("%-4c%-4H%-4c");
+								break;
+							}
+							case "LinearColor": {
+								p->value = data->sscanf("%-4F%-4F%-4F%-4F");
+								break;
+							}
+							case "Vector": {
+								//The wiki says these are floats, but the size seems to be 24,
+								//which is enough for three doubles. Is the size always the same?
+								//Note also that mLastSafeGroundPositions seems to be repeated.
+								//Is it necessary to combine into an array??
+								p->value = data->sscanf("%-8F%-8F%-8F");
+								break;
+							}
+							default: break;
+						}
+						sz = sizeof(data) - end;
+					*/
+			case "IntProperty": dest->sprintf("%c%-4c", 0, p->value); break;
+			case "FloatProperty": dest->sprintf("%c%-4F", 0, p->value); break;
+			case "DoubleProperty": dest->sprintf("%c%-8F", 0, p->value); break;
+			case "StrProperty": dest->sprintf("%c%-4H", 0, nt(p->value)); break;
+			case "ObjectProperty": dest->sprintf("%c%-4H%-4H", 0, nt(p->value->level), nt(p->value->path)); break;
+			default: dest->add(0); break; //The rest (if any) will be in residue
+		}
+		if (p->residue) dest->add(p->residue);
+		prop_size->apply();
+	}
+	dest->sprintf("%-4H", "None\0"); //End marker. If it had a type originally, it'll be in _residue.
 	if (props->_residue) dest->add(props->_residue);
+	if ((string)dest != props->_raw)
+		write("Encode %O\nResult: [%d] %O\nOrigin: [%d] %O\n", props, sizeof(dest), (string)dest, sizeof(props->_raw), props->_raw);
+	_orig_dest->add(dest);
 }
 
 //Reconstruct the main body of a savefile (which gets compressed in chunks for actual serialization)
