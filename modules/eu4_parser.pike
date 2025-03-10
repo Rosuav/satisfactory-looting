@@ -816,7 +816,7 @@ void update_all_eu4() {G->G->websocket_types->tag->update_all_groups();}
 //Spawn and communicate with the parser subprocess
 Stdio.File parser_pipe = G->G->parser_pipe;
 int parsing = -1;
-void process_savefile(string fn) {parsing = 0; update_all_eu4(); parser_pipe->write(fn + "\n");}
+void process_savefile(string fn) {parsing = 0; call_out(update_all_eu4, 0); parser_pipe->write(fn + "\n");}
 void parser_pipe_msg(object pipe, string msg) {
 	msg += parser_pipe->read() || ""; //Purge any spare text
 	foreach ((array)msg, int chr) {
