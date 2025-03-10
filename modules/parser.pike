@@ -136,6 +136,7 @@ class ObjectRef(string level, string path) {
 			mapping parse_properties(int end, int(1bit) chain, string path) {
 				mapping ret = ([]);
 				ret->_raw = ((string)data)[..sizeof(data) - end - 1]; //HACK
+				ret->_keyorder = ({ });
 				/* Next plans
 				Rework the props result mapping (here "ret") to have a properly-cooked version,
 				and a typed version intended for manipulation and re-export. The cooked version
@@ -156,6 +157,7 @@ class ObjectRef(string level, string path) {
 					//if (prop == "mVisitedAreas\0") write("*** FOUND %O --> %O\n", path, prop);
 					[string type] = data->sscanf("%-4H");
 					if (interesting) write("[%s] Prop %O %O\n", path, prop, type);
+					ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
 					mapping p = ret[prop - "\0"] = (["type": type - "\0"]);
 					[int sz, p->idx] = data->sscanf("%-4c%-4c");
 					int end;
@@ -195,7 +197,7 @@ class ObjectRef(string level, string path) {
 									break;
 								}
 								case "ByteProperty": arr += data->sscanf("%c"); break;
-								default: if (interesting) write("UNKNOWN ARRAY SUBTYPE %O [%d]\n", p->subtype, elements + 1); break;
+								default: if (interesting) write("UNKNOWN ARRAY SUBTYPE %O [%d]\n", p->subtype, elements + 1); elements = 0; break;
 							}
 						}
 						sz = sizeof(data) - end;
@@ -488,27 +490,29 @@ string nt(string val) {
 void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 	//if (props->_raw) {dest->add(props->_raw); return;}
 	Stdio.Buffer dest = Stdio.Buffer();
-	foreach (props; string name; mapping p) if (name[0] != '_') {
+	//foreach (props; string name; mapping p) if (name[0] != '_') { //Simplify, don't require the key order to be specified
+	foreach (props->_keyorder, string name) {mapping p = props[name]; //Enforce output order for perfect round tripping
 		//TODO: What happens with prop->idx? It seems to be always zero?
 		dest->sprintf("%-4H%-4H", nt(name), nt(p->type));
 		object prop_size = buffer_size(dest, "%-4c");
 		dest->sprintf("%-4c", p->idx);
 		prop_size->ref += 5; //There should always be a padding byte.
 		//TODO: Everything that was resetting end or sz during parse_properties will need to update prop_size->ref
+		object struct_size;
 		switch (p->type) {
 			case "BoolProperty": dest->sprintf("%c%c", p->value, 0); break;
 			case "ArrayProperty": case "SetProperty": {
 				//Complex types have a single type
 				dest->sprintf("%-4H%c%-4c", nt(p->subtype), 0, sizeof(p->value));
-				object struct_size;
-				foreach (p->value, mixed elem) switch (p->subtype) {
+				prop_size->ref = sizeof(dest) - 4;
+				foreach (p->value; int i; mixed elem) switch (p->subtype) {
 					case "ObjectProperty": dest->sprintf("%-4H%-4H", nt(elem->level), nt(elem->path)); break;
 					case "StructProperty": {
-						if (sizeof(p->value)) elem->_type = p->value[0]->_type;
-						else {
+						if (!i) {
 							dest->sprintf("%-4H%-4H", nt(name), "StructProperty\0"); //Repeated info
 							struct_size = buffer_size(dest, "%-8c");
 							dest->sprintf("%-4H%17c", nt(elem->_type), 0);
+							struct_size->ref = sizeof(dest);
 						}
 						switch (elem->_type) {
 							case "SpawnData": case "MapMarker": //A lot will be property lists
@@ -521,47 +525,40 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 					case "ByteProperty": dest->sprintf("%c", elem); break;
 					default: break;
 				}
-				if (struct_size) struct_size->apply();
 				break;
 			}
 			case "ByteProperty": dest->sprintf("%-4H%c%c", nt(p->subtype), 0, p->value); break;
 			case "EnumProperty": dest->sprintf("%-4H%c%-4H", nt(p->subtype), 0, nt(p->value)); break;
 			case "MapProperty": dest->sprintf("%-4H%-4H%c", p->keytype, p->valtype, 0); break; //The actual mapping will be in residue
-			case "StructProperty": break;
-					/*
-					} else if (type == "StructProperty\0") {
-						//Struct types have more padding
-						[p->subtype, int zero] = data->sscanf("%-4H%17c");
-						p->subtype -= "\0";
-						if (interesting) write("Type %O\n", type);
-						end = sizeof(data) - sz;
-						switch (p->subtype) {
-							case "InventoryStack": case "Vector_NetQuantize": {
-								//The stack itself is a property list. But a StructProperty inside it has less padding??
-								//write("RAW INVENTORY %O\n", ((string)data)[..sizeof(data) - end - 1]);
-								p->value = parse_properties(end, 0, path + " --> " + prop - "\0");
-								break;
-							}
-							case "InventoryItem": {
-								[int padding, p->value, p->unk] = data->sscanf("%-4c%-4H%-4c");
-								break;
-							}
-							case "LinearColor": {
-								p->value = data->sscanf("%-4F%-4F%-4F%-4F");
-								break;
-							}
-							case "Vector": {
-								//The wiki says these are floats, but the size seems to be 24,
-								//which is enough for three doubles. Is the size always the same?
-								//Note also that mLastSafeGroundPositions seems to be repeated.
-								//Is it necessary to combine into an array??
-								p->value = data->sscanf("%-8F%-8F%-8F");
-								break;
-							}
-							default: break;
-						}
-						sz = sizeof(data) - end;
-					*/
+			case "StructProperty": {
+				//Struct types have more padding
+				dest->sprintf("%-4H%17c", nt(p->subtype), 0);
+				prop_size->ref = sizeof(dest);
+				switch (p->subtype) {
+					case "InventoryStack": case "Vector_NetQuantize": {
+						encode_properties(dest, p->value);
+						break;
+					}
+					case "InventoryItem": {
+						dest->sprintf("%-4c%-4H%-4c", 0, p->value, p->unk);
+						break;
+					}
+					case "LinearColor": {
+						dest->sprintf("%-4F%-4F%-4F%-4F", @p->value);
+						break;
+					}
+					case "Vector": {
+						//The wiki says these are floats, but the size seems to be 24,
+						//which is enough for three doubles. Is the size always the same?
+						//Note also that mLastSafeGroundPositions seems to be repeated.
+						//Is it necessary to combine into an array??
+						dest->sprintf("%-8F%-8F%-8F", @p->value);
+						break;
+					}
+					default: break;
+				}
+				break;
+			}
 			case "IntProperty": dest->sprintf("%c%-4c", 0, p->value); break;
 			case "FloatProperty": dest->sprintf("%c%-4F", 0, p->value); break;
 			case "DoubleProperty": dest->sprintf("%c%-8F", 0, p->value); break;
@@ -571,11 +568,17 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 		}
 		if (p->residue) dest->add(p->residue);
 		prop_size->apply();
+		if (struct_size) struct_size->apply();
 	}
 	dest->sprintf("%-4H", "None\0"); //End marker. If it had a type originally, it'll be in _residue.
 	if (props->_residue) dest->add(props->_residue);
-	if ((string)dest != props->_raw)
-		write("Encode %O\nResult: [%d] %O\nOrigin: [%d] %O\n", props, sizeof(dest), (string)dest, sizeof(props->_raw), props->_raw);
+	if ((string)dest != props->_raw) {
+		string d = (string)dest, paired = String.common_prefix(({d, props->_raw}));
+		write("Encode %O\nResult: [%3d] %O\nOrigin: [%3d] %O\nPaired: [%3d] %O\n",
+			props, sizeof(dest), (string)dest, sizeof(props->_raw), props->_raw,
+			sizeof(paired), paired,
+		);
+	}
 	_orig_dest->add(dest);
 }
 
