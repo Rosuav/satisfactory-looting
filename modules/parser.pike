@@ -125,6 +125,8 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 		} else if (type == "MapProperty\0") {
 			//Mapping types have two types (key and value)
 			[p->keytype, p->valtype, int zero] = data->sscanf("%-4H%-4H%c");
+			//write("GOT A MAP %O %O %O\n", path, p->keytype, p->valtype);
+			//if (sizeof(ret->_raw) < 2048) werror("Raw: %O\n", ret->_raw);
 		} else if (type == "StructProperty\0") {
 			//Struct types have more padding
 			[p->subtype, int zero] = data->sscanf("%-4H%17c");

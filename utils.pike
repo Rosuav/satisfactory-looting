@@ -12,41 +12,14 @@ void help() {
 void test() {
 	object parser = G->bootstrap("modules/parser.pike");
 	program ObjectRef = parser->ObjectRef;
-	mapping props = ([ /* 8 elements */
-  "KilledOnDayNr": ([ /* 3 elements */
-      "idx": 0,
-      "type": "IntProperty",
-      "value": 4294967295
-    ]),
-  "NumTimesKilled": ([ /* 3 elements */
-      "idx": 0,
-      "type": "IntProperty",
-      "value": 0
-    ]),
-  "WasKilled": ([ /* 3 elements */
-      "idx": 0,
-      "type": "BoolProperty",
-      "value": 0
-    ]),
-  "_keyorder": ({ /* 4 elements */
-        "creature",
-        "WasKilled",
-        "NumTimesKilled",
-        "KilledOnDayNr"
-    }),
-  "_path": "/Game/FactoryGame/Character/Creature/BP_CreatureSpawner.BP_CreatureSpawner_C --> mSpawnData",
-  "_raw": "\t\0\0\0creature\0\17\0\0\0ObjectProperty\0\b\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\n"
-    "\0\0\0WasKilled\0\r\0\0\0BoolProperty\0\0\0\0\0\0\0\0\0\0\0\17\0\0\0NumTimesKilled\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\0\0\0\0\16\0\0\0KilledOnDayNr\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\377\377\377\377\5\0\0\0None\0\t\0\0\0creature\0\17\0\0\0ObjectProperty\0\b\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\n"
-    "\0\0\0WasKilled\0\r\0\0\0BoolProperty\0\0\0\0\0\0\0\0\0\0\0\17\0\0\0NumTimesKilled\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\0\0\0\0\16\0\0\0KilledOnDayNr\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\377\377\377\377\5\0\0\0None\0",
-  "_type": "SpawnData",
-  "creature": ([ /* 3 elements */
-      "idx": 0,
-      "type": "ObjectProperty",
-      "value": ObjectRef("", "")
-    ])
+	mapping props = ([
+"_raw": "\v\0\0\0mSortRules\0\16\0\0\0ArrayProperty\0d\2\0\0\0\0\0\0\17\0\0\0StructProperty\0\0\3\0\0\0\v\0\0\0mSortRules\0\17\0\0\0StructProperty\0\20\2\0\0\0\0\0\0\21\0\0\0SplitterSortRule\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\n"
+"\0\0\0ItemClass\0\17\0\0\0ObjectProperty\0P\0\0\0\0\0\0\0\0\0\0\0\0H\0\0\0/Game/FactoryGame/Resource/FilteringRules/Desc_Wildcard.Desc_Wildcard_C\0\f\0\0\0OutputIndex\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0\0None\0\n"
+"\0\0\0ItemClass\0\17\0\0\0ObjectProperty\0P\0\0\0\0\0\0\0\0\0\0\0\0H\0\0\0/Game/FactoryGame/Resource/FilteringRules/Desc_Wildcard.Desc_Wildcard_C\0\f\0\0\0OutputIndex\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\2\0\0\0\5\0\0\0None\0\n"
+"\0\0\0ItemClass\0\17\0\0\0ObjectProperty\0P\0\0\0\0\0\0\0\0\0\0\0\0H\0\0\0/Game/FactoryGame/Resource/FilteringRules/Desc_Overflow.Desc_Overflow_C\0\f\0\0\0OutputIndex\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\1\0\0\0\5\0\0\0None\0\25\0\0\0mItemToLastOutputMap\0\f\0\0\0MapProperty\0Y\0\0\0\0\0\0\0\17\0\0\0ObjectProperty\0\r\0\0\0ByteProperty\0\0\0\0\0\0\1\0\0\0\0\0\0\0H\0\0\0/Game/FactoryGame/Resource/FilteringRules/Desc_Wildcard.Desc_Wildcard_C\0\0\21\0\0\0mLastOutputIndex\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\1\0\0\0\21\0\0\0mBufferInventory\0\17\0\0\0ObjectProperty\0~\0\0\0\0\0\0\0\0\21\0\0\0Persistent_Level\0e\0\0\0Persistent_Level:PersistentLevel.Build_ConveyorAttachmentSplitterSmart_C_2146639573.StorageInventory\0\23\0\0\0mCustomizationData\0\17\0\0\0StructProperty\0\233\0\0\0\0\0\0\0\31\0\0\0FactoryCustomizationData\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\v\0\0\0SwatchDesc\0\17\0\0\0ObjectProperty\0g\0\0\0\0\0\0\0\0\0\0\0\0_\0\0\0/Game/FactoryGame/Buildable/-Shared/Customization/Swatches/SwatchDesc_Slot0.SwatchDesc_Slot0_C\0\5\0\0\0None\0\21\0\0\0mBuiltWithRecipe\0\17\0\0\0ObjectProperty\0|\0\0\0\0\0\0\0\0\0\0\0\0t\0\0\0/Game/FactoryGame/Recipes/Buildings/Recipe_ConveyorAttachmentSplitterSmart.Recipe_ConveyorAttachmentSplitterSmart_C\0\5\0\0\0None\0\0\0\0\0"
 ]);
 	//~ parser->encode_properties(Stdio.Buffer(), props); return;
-	//~ werror("Reparsed: %O\n", parser->parse_properties(Stdio.Buffer(props->_raw), 0, 0, "")); return;
+	werror("Reparsed: %O\n", parser->parse_properties(Stdio.Buffer(props->_raw), 0, 0, "")); return;
 	mapping save = parser->cached_parse_savefile("Assembly First_autosave_1.sav");
 	write("Got save %O\n", indices(save->tree));
 	string data = parser->reconstitute_savefile(save->tree);
