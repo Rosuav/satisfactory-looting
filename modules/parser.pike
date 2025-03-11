@@ -16,6 +16,7 @@ class ObjectRef(string level, string path, int|void soft) {
 	//Note that the "soft" part of a softobjectreference isn't reflected in the %O. If this
 	//becomes a problem, consider making SoftObjectRef a separate class.
 	protected string _sprintf(int type) {return (type == 's' || type == 'O') && sprintf("ObjectRef(%O, %O)", level, path);}
+	string encode_json() {return sprintf("\"%s :: %s\"", level, path);}
 }
 
 @export: mapping cached_parse_savefile(string fn) {
