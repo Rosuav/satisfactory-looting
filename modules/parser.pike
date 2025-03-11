@@ -558,7 +558,11 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 					}
 					break;
 				}
-				case "ByteProperty": dest->sprintf("%-4H%c%c", nt(p->subtype), 0, p->value); break;
+				case "ByteProperty":
+					dest->sprintf("%-4H%c", nt(p->subtype), 0);
+					prop_size->ref = sizeof(dest);
+					dest->sprintf("%c", p->value);
+					break;
 				case "EnumProperty":
 					dest->sprintf("%-4H%c", nt(p->subtype), 0);
 					prop_size->ref = sizeof(dest);
