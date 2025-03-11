@@ -19,6 +19,168 @@ class ObjectRef(string level, string path, int|void soft) {
 	string encode_json() {return sprintf("\"%s :: %s\"", level, path);}
 }
 
+//Properties. If chain, expect more meaningful data after the None - otherwise, everything up to the end marker will be discarded.
+mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string path) {
+	mapping ret = ([]);
+	ret->_raw = ((string)data)[..sizeof(data) - end - 1]; //HACK
+	ret->_keyorder = ({ });
+	/* Next plans
+	Rework the props result mapping (here "ret") to have a properly-cooked version,
+	and a typed version intended for manipulation and re-export. The cooked version
+	will not have the trailing nulls, will have only the interesting parts, and in
+	fact, may not need to exist for all properties - only the ones we actually use.
+	The typed version will always have a mapping for every property, starting with
+	the property's Type.
+
+	1. Build the typed and cooked versions. Or just build the typed version, and
+	   rework everything to use that instead of the current hybrid.
+	2. Reconstitute the typed version into the savefile (below)
+	3. Provide helpers for manipulating the property list and/or object list.
+	*/
+	while (sizeof(data) > end) {
+		[string prop] = data->sscanf("%-4H");
+		if (prop == "None\0") break; //There MAY still be a type after that, but it won't be relevant. If there is, it'll be skipped in the END part.
+		//To search for something found by scanning the strings:
+		//if (prop == "mVisitedAreas\0") write("*** FOUND %O --> %O\n", path, prop);
+		[string type] = data->sscanf("%-4H");
+		mapping p = (["type": type - "\0"]);
+		[int sz, p->idx] = data->sscanf("%-4c%-4c");
+		if (p->idx) {
+			//Currently the ONLY attribute that uses this is mLastSafeGroundPositions
+			//There are three such positions stored, and they're simply duplicated.
+			//We wrap it up into another layer, ensuring that we keep everything.
+			//Note that this code won't trigger until we hit the second one of the
+			//arrayish, so the first one will already have been saved in the regular
+			//way. Note that we don't check that the index is actually increasing,
+			//just that it's nonzero on all but the first.
+			mapping prev = ret[prop - "\0"];
+			if (prev->type == "_repetition")
+				//It's a third or subsequent of the same thing.
+				prev->values += ({p});
+			else
+				//It's the second. Build the array.
+				ret[prop - "\0"] = ([
+					"type": "_repetition",
+					"values": ({prev, p}),
+				]);
+		}
+		else {
+			ret[prop - "\0"] = p;
+			ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
+		}
+		int end;
+		if (type == "BoolProperty\0") {
+			//Special-case: Doesn't have a type string, has the value in there instead
+			[p->value, int zero] = data->sscanf("%c%c");
+		} else if ((<"ArrayProperty\0", "SetProperty\0">)[type]) {
+			//Complex types have a single type
+			[p->subtype, int zero] = data->sscanf("%-4H%c");
+			//Empty array??? Unconfirmed. May have been only due to a prior bug.
+			if (p->subtype == "None\0") {write("None type in %O %O", type, path); data->read(sz); sz = 0; continue;}
+			p->subtype -= "\0";
+			end = sizeof(data) - sz;
+			[int elements] = data->sscanf("%-4c");
+			array arr = ({ });
+			while (elements--) {
+				switch (p->subtype) {
+					case "InterfaceProperty": //Behaves basically the same as an ObjectRef. Should they be distinguished in any way?
+					case "ObjectProperty": arr += ({ObjectRef(@data->sscanf("%-4H%-4H"))}); break;
+					case "SoftObjectProperty": arr += ({ObjectRef(@data->sscanf("%-4H%-4H%-4c"))}); break;
+					case "StructProperty": {
+						mapping struct = ([]);
+						if (sizeof(arr)) struct->_type = arr[0]->_type;
+						else {
+							data->sscanf("%-4H%-4H%-8c"); //Uninteresting - mostly repeated info from elsewhere
+							[struct->_type, int zero] = data->sscanf("%-4H%17c");
+							struct->_type -= "\0";
+						}
+						//struct->_raw = ((string)data)[..sizeof(data) - end - 1];
+						switch (struct->_type) {
+							case "SpawnData": case "MapMarker": //A lot will be property lists
+								struct |= parse_properties(data, end, 1, path + " --> " + prop - "\0");
+								break;
+							default: break; //Unknown - just skip to the next one
+						}
+						arr += ({struct});
+						break;
+					}
+					case "ByteProperty": arr += data->sscanf("%c"); break;
+					case "IntProperty": arr += data->sscanf("%-4c"); break;
+					case "Int64Property": arr += data->sscanf("%-8c"); break;
+					default: write("UNKNOWN ARRAY SUBTYPE %O [%d elem, %d bytes] %O\n", p->subtype, elements + 1, sizeof(data) - end, ((string)data)[..sizeof(data) - end - 1]); elements = 0; break;
+				}
+			}
+			sz = sizeof(data) - end;
+			p->value = arr;
+		} else if (type == "ByteProperty\0") {
+			[p->subtype, int zero, p->value] = data->sscanf("%-4H%c%c");
+			p->subtype -= "\0";
+			--sz;
+		} else if (type == "EnumProperty\0") {
+			[p->subtype, int zero] = data->sscanf("%-4H%c");
+			p->subtype -= "\0";
+			end = sizeof(data) - sz;
+			p->value = data->sscanf("%-4H")[0] - "\0";
+		} else if (type == "MapProperty\0") {
+			//Mapping types have two types (key and value)
+			[p->keytype, p->valtype, int zero] = data->sscanf("%-4H%-4H%c");
+		} else if (type == "StructProperty\0") {
+			//Struct types have more padding
+			[p->subtype, int zero] = data->sscanf("%-4H%17c");
+			p->subtype -= "\0";
+			end = sizeof(data) - sz;
+			switch (p->subtype) {
+				case "InventoryStack": case "Vector_NetQuantize": {
+					//The stack itself is a property list. But a StructProperty inside it has less padding??
+					//write("RAW INVENTORY %O\n", ((string)data)[..sizeof(data) - end - 1]);
+					p->value = parse_properties(data, end, 0, path + " --> " + prop - "\0");
+					break;
+				}
+				case "InventoryItem": {
+					[int padding, p->value, p->unk] = data->sscanf("%-4c%-4H%-4c");
+					break;
+				}
+				case "LinearColor": {
+					p->value = data->sscanf("%-4F%-4F%-4F%-4F");
+					break;
+				}
+				case "Vector": {
+					//The wiki says these are floats, but the size seems to be 24,
+					//which is enough for three doubles. Is the size always the same?
+					p->value = data->sscanf("%-8F%-8F%-8F");
+					break;
+				}
+				default: break;
+			}
+			sz = sizeof(data) - end;
+		} else if (type == "IntProperty\0") {
+			[int zero, p->value] = data->sscanf("%c%-4c");
+			sz -= 4;
+		} else if (type == "FloatProperty\0") {
+			[int zero, p->value] = data->sscanf("%c%-4F");
+			sz -= 4;
+		} else if (type == "DoubleProperty\0") {
+			[int zero, p->value] = data->sscanf("%c%-8F");
+			sz -= 8;
+		} else if (type == "StrProperty\0") {
+			end = sizeof(data) - sz - 1;
+			[int zero, p->value] = data->sscanf("%c%-4H");
+			p->value -= "\0";
+		} else if (type == "ObjectProperty\0") {
+			end = sizeof(data) - sz - 1;
+			p->value = ObjectRef(@data->sscanf("%*c%-4H%-4H"));
+		} else {
+			//Primitive types have no type notation
+			[int zero] = data->sscanf("%c");
+		}
+		if (end) sz = sizeof(data) - end;
+		if (sz) p->residue = data->read(sz);
+	}
+	if (!chain && sizeof(data) > end)
+		ret->_residue = data->read(sizeof(data) - end);
+	return ret;
+}
+
 @export: mapping cached_parse_savefile(string fn) {
 	//NOTE: This does not validate the file name by ensuring that it is found in the directory.
 	//If the file name comes from an untrusted source, first call check_savefile_name() above.
@@ -135,172 +297,7 @@ class ObjectRef(string level, string path, int|void soft) {
 			} else {
 				//Object. Nothing interesting here.
 			}
-			//Properties. If chain, expect more meaningful data after the None - otherwise, everything up to the end marker will be discarded.
-			mapping parse_properties(int end, int(1bit) chain, string path) {
-				mapping ret = ([]);
-				ret->_raw = ((string)data)[..sizeof(data) - end - 1]; //HACK
-				ret->_keyorder = ({ });
-				/* Next plans
-				Rework the props result mapping (here "ret") to have a properly-cooked version,
-				and a typed version intended for manipulation and re-export. The cooked version
-				will not have the trailing nulls, will have only the interesting parts, and in
-				fact, may not need to exist for all properties - only the ones we actually use.
-				The typed version will always have a mapping for every property, starting with
-				the property's Type.
-
-				1. Build the typed and cooked versions. Or just build the typed version, and
-				   rework everything to use that instead of the current hybrid.
-				2. Reconstitute the typed version into the savefile (below)
-				3. Provide helpers for manipulating the property list and/or object list.
-				*/
-				while (sizeof(data) > end) {
-					[string prop] = data->sscanf("%-4H");
-					if (prop == "None\0") break; //There MAY still be a type after that, but it won't be relevant. If there is, it'll be skipped in the END part.
-					//To search for something found by scanning the strings:
-					//if (prop == "mVisitedAreas\0") write("*** FOUND %O --> %O\n", path, prop);
-					[string type] = data->sscanf("%-4H");
-					if (interesting) write("[%s] Prop %O %O\n", path, prop, type);
-					mapping p = (["type": type - "\0"]);
-					[int sz, p->idx] = data->sscanf("%-4c%-4c");
-					if (p->idx) {
-						//Currently the ONLY attribute that uses this is mLastSafeGroundPositions
-						//There are three such positions stored, and they're simply duplicated.
-						//We wrap it up into another layer, ensuring that we keep everything.
-						//Note that this code won't trigger until we hit the second one of the
-						//arrayish, so the first one will already have been saved in the regular
-						//way. Note that we don't check that the index is actually increasing,
-						//just that it's nonzero on all but the first.
-						mapping prev = ret[prop - "\0"];
-						if (prev->type == "_repetition")
-							//It's a third or subsequent of the same thing.
-							prev->values += ({p});
-						else
-							//It's the second. Build the array.
-							ret[prop - "\0"] = ([
-								"type": "_repetition",
-								"values": ({prev, p}),
-							]);
-					}
-					else {
-						ret[prop - "\0"] = p;
-						ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
-					}
-					int end;
-					if (type == "BoolProperty\0") {
-						//Special-case: Doesn't have a type string, has the value in there instead
-						[p->value, int zero] = data->sscanf("%c%c");
-					} else if ((<"ArrayProperty\0", "SetProperty\0">)[type]) {
-						//Complex types have a single type
-						[p->subtype, int zero] = data->sscanf("%-4H%c");
-						//Empty array??? Unconfirmed. May have been only due to a prior bug.
-						if (p->subtype == "None\0") {write("None type in %O %O", type, path); data->read(sz); sz = 0; continue;}
-						p->subtype -= "\0";
-						end = sizeof(data) - sz;
-						[int elements] = data->sscanf("%-4c");
-						array arr = ({ });
-						if (interesting) write("Subtype %O, %d elem\n", p->subtype, elements);
-						while (elements--) {
-							switch (p->subtype) {
-								case "InterfaceProperty": //Behaves basically the same as an ObjectRef. Should they be distinguished in any way?
-								case "ObjectProperty": arr += ({ObjectRef(@data->sscanf("%-4H%-4H"))}); break;
-								case "SoftObjectProperty": arr += ({ObjectRef(@data->sscanf("%-4H%-4H%-4c"))}); break;
-								case "StructProperty": {
-									//if (interesting) {write("Array of struct %O\n", data->read(sizeof(data) - end)); break;}
-									mapping struct = ([]);
-									if (sizeof(arr)) struct->_type = arr[0]->_type;
-									else {
-										data->sscanf("%-4H%-4H%-8c"); //Uninteresting - mostly repeated info from elsewhere
-										[struct->_type, int zero] = data->sscanf("%-4H%17c");
-										struct->_type -= "\0";
-									}
-									//struct->_raw = ((string)data)[..sizeof(data) - end - 1];
-									switch (struct->_type) {
-										case "SpawnData": case "MapMarker": //A lot will be property lists
-											struct |= parse_properties(end, 1, path + " --> " + prop - "\0");
-											break;
-										default: break; //Unknown - just skip to the next one
-									}
-									arr += ({struct});
-									break;
-								}
-								case "ByteProperty": arr += data->sscanf("%c"); break;
-								case "IntProperty": arr += data->sscanf("%-4c"); break;
-								case "Int64Property": arr += data->sscanf("%-8c"); break;
-								default: if (!interesting) write("UNKNOWN ARRAY SUBTYPE %O [%d elem, %d bytes] %O\n", p->subtype, elements + 1, sizeof(data) - end, ((string)data)[..sizeof(data) - end - 1]); elements = 0; break;
-							}
-						}
-						sz = sizeof(data) - end;
-						p->value = arr;
-					} else if (type == "ByteProperty\0") {
-						[p->subtype, int zero, p->value] = data->sscanf("%-4H%c%c");
-						p->subtype -= "\0";
-						--sz;
-					} else if (type == "EnumProperty\0") {
-						[p->subtype, int zero] = data->sscanf("%-4H%c");
-						p->subtype -= "\0";
-						end = sizeof(data) - sz;
-						p->value = data->sscanf("%-4H")[0] - "\0";
-					} else if (type == "MapProperty\0") {
-						//Mapping types have two types (key and value)
-						[p->keytype, p->valtype, int zero] = data->sscanf("%-4H%-4H%c");
-					} else if (type == "StructProperty\0") {
-						//Struct types have more padding
-						[p->subtype, int zero] = data->sscanf("%-4H%17c");
-						p->subtype -= "\0";
-						if (interesting) write("Type %O\n", type);
-						end = sizeof(data) - sz;
-						switch (p->subtype) {
-							case "InventoryStack": case "Vector_NetQuantize": {
-								//The stack itself is a property list. But a StructProperty inside it has less padding??
-								//write("RAW INVENTORY %O\n", ((string)data)[..sizeof(data) - end - 1]);
-								p->value = parse_properties(end, 0, path + " --> " + prop - "\0");
-								break;
-							}
-							case "InventoryItem": {
-								[int padding, p->value, p->unk] = data->sscanf("%-4c%-4H%-4c");
-								break;
-							}
-							case "LinearColor": {
-								p->value = data->sscanf("%-4F%-4F%-4F%-4F");
-								break;
-							}
-							case "Vector": {
-								//The wiki says these are floats, but the size seems to be 24,
-								//which is enough for three doubles. Is the size always the same?
-								p->value = data->sscanf("%-8F%-8F%-8F");
-								break;
-							}
-							default: break;
-						}
-						sz = sizeof(data) - end;
-					} else if (type == "IntProperty\0") {
-						[int zero, p->value] = data->sscanf("%c%-4c");
-						sz -= 4;
-					} else if (type == "FloatProperty\0") {
-						[int zero, p->value] = data->sscanf("%c%-4F");
-						sz -= 4;
-					} else if (type == "DoubleProperty\0") {
-						[int zero, p->value] = data->sscanf("%c%-8F");
-						sz -= 8;
-					} else if (type == "StrProperty\0") {
-						end = sizeof(data) - sz - 1;
-						[int zero, p->value] = data->sscanf("%c%-4H");
-						p->value -= "\0";
-					} else if (type == "ObjectProperty\0") {
-						end = sizeof(data) - sz - 1;
-						p->value = ObjectRef(@data->sscanf("%*c%-4H%-4H"));
-					} else {
-						//Primitive types have no type notation
-						[int zero] = data->sscanf("%c");
-					}
-					if (end) sz = sizeof(data) - end;
-					if (sz) p->residue = data->read(sz);
-				}
-				if (!chain && sizeof(data) > end)
-					ret->_residue = data->read(sizeof(data) - end);
-				return ret;
-			}
-			mapping prop = obj->prop = parse_properties(propend, 0, objects[i][1] - "\0");
+			mapping prop = obj->prop = parse_properties(data, propend, 0, objects[i][1] - "\0");
 			if (interesting) write("Properties %O\n", prop);
 			if (has_value(objects[i][1], "Pickup_Spawnable")) {
 				string id = (replace(prop->mPickupItems->value->Item->value, "\0", "") / ".")[-1];
