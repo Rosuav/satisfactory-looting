@@ -22,7 +22,7 @@ class ObjectRef(string level, string path, int|void soft) {
 //Properties. If chain, expect more meaningful data after the None - otherwise, everything up to the end marker will be discarded.
 mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string path) {
 	mapping ret = ([]);
-	ret->_raw = ((string)data)[..sizeof(data) - end - 1]; //HACK
+	ret->_raw = ((string)data)[..sizeof(data) - end - 1]; ret->_path = path; //HACK
 	ret->_keyorder = ({ });
 	/* Next plans
 	Rework the props result mapping (here "ret") to have a properly-cooked version,
@@ -54,6 +54,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 			//way. Note that we don't check that the index is actually increasing,
 			//just that it's nonzero on all but the first.
 			mapping prev = ret[prop - "\0"];
+			if (!prev) werror("NO PREV BUT IDX %O %O %O\n", path, prop, p->idx);
 			if (prev->type == "_repetition")
 				//It's a third or subsequent of the same thing.
 				prev->values += ({p});
@@ -178,6 +179,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 	}
 	if (!chain && sizeof(data) > end)
 		ret->_residue = data->read(sizeof(data) - end);
+	else ret->_raw = ret->_raw[..sizeof(ret->_raw) - (sizeof(data) - end) - 1]; //More hack
 	return ret;
 }
 
@@ -616,6 +618,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 			props, sizeof(dest), (string)dest, sizeof(props->_raw), props->_raw,
 			sizeof(paired), paired,
 		);
+		write("Reparse: %O\n", parse_properties(Stdio.Buffer((string)dest), 0, 0, "reparse"));
 	}
 	_orig_dest->add(dest);
 }

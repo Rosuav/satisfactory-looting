@@ -12,32 +12,41 @@ void help() {
 void test() {
 	object parser = G->bootstrap("modules/parser.pike");
 	program ObjectRef = parser->ObjectRef;
-	mapping props = ([ /* 6 elements */
-  "_keyorder": ({ /* 3 elements */
-        "mSaveSessionName",
-        "mLastAutoSaveId",
-        "mStartingPointTagName"
+	mapping props = ([ /* 8 elements */
+  "KilledOnDayNr": ([ /* 3 elements */
+      "idx": 0,
+      "type": "IntProperty",
+      "value": 4294967295
+    ]),
+  "NumTimesKilled": ([ /* 3 elements */
+      "idx": 0,
+      "type": "IntProperty",
+      "value": 0
+    ]),
+  "WasKilled": ([ /* 3 elements */
+      "idx": 0,
+      "type": "BoolProperty",
+      "value": 0
+    ]),
+  "_keyorder": ({ /* 4 elements */
+        "creature",
+        "WasKilled",
+        "NumTimesKilled",
+        "KilledOnDayNr"
     }),
-  "_raw": "\21\0\0\0mSaveSessionName\0\f\0\0\0StrProperty\0\23\0\0\0\0\0\0\0\0\17\0\0\0Assembly First\0\20\0\0\0mLastAutoSaveId\0\r\0\0\0ByteProperty\0\1\0\0\0\0\0\0\0\5\0\0\0None\0\0\1\26\0\0\0mStartingPointTagName\0\r\0\0\0NameProperty\0\21\0\0\0\0\0\0\0\0\r\0\0\0Grass Fields\0\5\0\0\0None\0\0\0\0\0\0\0\0\0",
-  "_residue": "\0\0\0\0\0\0\0\0",
-  "mLastAutoSaveId": ([ /* 4 elements */
+  "_path": "/Game/FactoryGame/Character/Creature/BP_CreatureSpawner.BP_CreatureSpawner_C --> mSpawnData",
+  "_raw": "\t\0\0\0creature\0\17\0\0\0ObjectProperty\0\b\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\n"
+    "\0\0\0WasKilled\0\r\0\0\0BoolProperty\0\0\0\0\0\0\0\0\0\0\0\17\0\0\0NumTimesKilled\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\0\0\0\0\16\0\0\0KilledOnDayNr\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\377\377\377\377\5\0\0\0None\0\t\0\0\0creature\0\17\0\0\0ObjectProperty\0\b\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\n"
+    "\0\0\0WasKilled\0\r\0\0\0BoolProperty\0\0\0\0\0\0\0\0\0\0\0\17\0\0\0NumTimesKilled\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\0\0\0\0\16\0\0\0KilledOnDayNr\0\f\0\0\0IntProperty\0\4\0\0\0\0\0\0\0\0\377\377\377\377\5\0\0\0None\0",
+  "_type": "SpawnData",
+  "creature": ([ /* 3 elements */
       "idx": 0,
-      "subtype": "None",
-      "type": "ByteProperty",
-      "value": 1
-    ]),
-  "mSaveSessionName": ([ /* 3 elements */
-      "idx": 0,
-      "type": "StrProperty",
-      "value": "Assembly First"
-    ]),
-  "mStartingPointTagName": ([ /* 3 elements */
-      "idx": 0,
-      "residue": "\r\0\0\0Grass Fields\0",
-      "type": "NameProperty"
+      "type": "ObjectProperty",
+      "value": ObjectRef("", "")
     ])
 ]);
-	parser->encode_properties(Stdio.Buffer(), props); return;
+	//~ parser->encode_properties(Stdio.Buffer(), props); return;
+	//~ werror("Reparsed: %O\n", parser->parse_properties(Stdio.Buffer(props->_raw), 0, 0, "")); return;
 	mapping save = parser->cached_parse_savefile("Assembly First_autosave_1.sav");
 	write("Got save %O\n", indices(save->tree));
 	string data = parser->reconstitute_savefile(save->tree);
