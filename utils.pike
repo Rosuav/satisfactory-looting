@@ -20,9 +20,9 @@ void test() {
 ]);
 	//~ parser->encode_properties(Stdio.Buffer(), props); return;
 	//~ mapping p = parser->parse_properties(Stdio.Buffer(props->_raw), 0, 0, ""); werror("Reparsed: %O\n", p); werror("Encoded: %O\n", parser->encode_properties(Stdio.Buffer(), p)); return;
-	mapping save = parser->cached_parse_savefile("Assembly First_autosave_1.sav");
+	mapping save = parser->cached_parse_savefile("Assembly First_autosave_2.sav");
 	write("Got save %O\n", indices(save->tree));
 	string data = parser->reconstitute_savefile(save->tree);
-	//Stdio.write_file(SATIS_SAVE_PATH + "/Reconstructed.sav", data);
+	Stdio.write_file(SATIS_SAVE_PATH + "/Reconstructed.sav", data);
 	//write("Reconstituted save has %d bytes\n", sizeof(data));
 }

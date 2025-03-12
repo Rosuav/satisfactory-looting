@@ -22,21 +22,8 @@ class ObjectRef(string level, string path, int|void soft) {
 //Properties. If chain, expect more meaningful data after the None - otherwise, everything up to the end marker will be discarded.
 mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string path) {
 	mapping ret = ([]);
-	ret->_raw = ((string)data)[..sizeof(data) - end - 1]; ret->_path = path; //HACK
-	ret->_keyorder = ({ });
-	/* Next plans
-	Rework the props result mapping (here "ret") to have a properly-cooked version,
-	and a typed version intended for manipulation and re-export. The cooked version
-	will not have the trailing nulls, will have only the interesting parts, and in
-	fact, may not need to exist for all properties - only the ones we actually use.
-	The typed version will always have a mapping for every property, starting with
-	the property's Type.
-
-	1. Build the typed and cooked versions. Or just build the typed version, and
-	   rework everything to use that instead of the current hybrid.
-	2. Reconstitute the typed version into the savefile (below)
-	3. Provide helpers for manipulating the property list and/or object list.
-	*/
+	//ret->_raw = ((string)data)[..sizeof(data) - end - 1]; ret->_path = path; //HACK
+	//ret->_keyorder = ({ });
 	while (sizeof(data) > end) {
 		[string prop] = data->sscanf("%-4H");
 		if (prop == "None\0") break; //There MAY still be a type after that, but it won't be relevant. If there is, it'll be skipped in the END part.
@@ -67,7 +54,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 		}
 		else {
 			ret[prop - "\0"] = p;
-			ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
+			//ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
 		}
 		int end;
 		if (type == "BoolProperty\0") {
@@ -188,7 +175,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 	}
 	if (!chain && sizeof(data) > end)
 		ret->_residue = data->read(sizeof(data) - end);
-	else ret->_raw = ret->_raw[..sizeof(ret->_raw) - (sizeof(data) - end) - 1]; //More hack
+	//else ret->_raw = ret->_raw[..sizeof(ret->_raw) - (sizeof(data) - end) - 1]; //More hack
 	return ret;
 }
 
@@ -525,8 +512,8 @@ string nt(string val) {
 void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 	//if (props->_raw) {dest->add(props->_raw); return;}
 	Stdio.Buffer dest = Stdio.Buffer();
-	//foreach (props; string name; mapping p) if (name[0] != '_') { //Simplify, don't require the key order to be specified
-	foreach (props->_keyorder, string name) {mapping p = props[name]; //Enforce output order for perfect round tripping
+	foreach (props; string name; mapping p) if (name[0] != '_') { //Simplify, don't require the key order to be specified
+	//foreach (props->_keyorder, string name) {mapping p = props[name]; //Enforce output order for perfect round tripping
 		foreach (p->type == "_repetition" ? p->values : ({p}), mapping p) {
 			dest->sprintf("%-4H%-4H", nt(name), nt(p->type));
 			object prop_size = buffer_size(dest, "%-4c");
@@ -631,7 +618,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 	}
 	dest->sprintf("%-4H", "None\0"); //End marker. If it had a type originally, it'll be in _residue.
 	if (props->_residue) dest->add(props->_residue);
-	if ((string)dest != props->_raw) {
+	if (props->_raw && (string)dest != props->_raw) {
 		string d = (string)dest, paired = String.common_prefix(({d, props->_raw}));
 		//if (sizeof(d) > 1024) write("Encode failed for large [%d] object\n", sizeof(d)); else //Temporarily suppress the big ones
 		write("Encode %O\nResult: [%3d] %O\nOrigin: [%3d] %O\nPaired: [%3d] %O\n",
