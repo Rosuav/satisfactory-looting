@@ -182,8 +182,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 @export: mapping cached_parse_savefile(string fn) {
 	//NOTE: This does not validate the file name by ensuring that it is found in the directory.
 	//If the file name comes from an untrusted source, first call check_savefile_name() above.
-	string filename = SATIS_SAVE_PATH + "/" + fn;
-	int mtime = file_stat(filename)->?mtime;
+	int mtime = file_stat(SATIS_SAVE_PATH + "/" + fn)->?mtime;
 	if (!mtime) return (["mtime": 0]); //File not found
 	if (mapping c = parse_cache[fn]) {
 		if (c->mtime == mtime && c->validity == CACHE_VALIDITY) return parse_cache[fn];
@@ -192,10 +191,15 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 	//NOTE: If this function is made asynchronous or there is any other way that this could run
 	//reentrantly, place a stub in the cache, and validate the stub before returning, blocking
 	//until the first parser has finished.
-	mapping ret = parse_cache[fn] = (["mtime": mtime]);
+	return parse_cache[fn] = (["mtime": mtime]) | low_parse_savefile(fn);
+}
+
+//Parse a savefile, bypassing the cache. Can be used when mutation is intended.
+mapping low_parse_savefile(string fn) {
+	mapping ret = ([]);
 
 	//------------- Parse the save file -------------//
-	Stdio.Buffer data = Stdio.Buffer(Stdio.read_file(filename));
+	Stdio.Buffer data = Stdio.Buffer(Stdio.read_file(SATIS_SAVE_PATH + "/" + fn));
 	data->read_only();
 	//Huh. Unlike the vast majority of games out there, Satisfactory has info on its official wiki.
 	//https://satisfactory.wiki.gg/wiki/Save_files
