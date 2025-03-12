@@ -27,7 +27,6 @@ void test() {
 			mapping props = obj[-1]->prop;
 			mapping|zero marks = props->mMapMarkers;
 			//if (!marks) ... //TODO
-			write("mMapMarkers %O\n", marks->value->MarkerID->value);
 			mapping newmark = ([
 				"_type": "MapMarker",
 				"_keyorder": ({"MarkerID", "Location", "Name", "CategoryName", "MapMarkerType", "IconID", "Color", "Scale", "compassViewDistance"}),
@@ -41,7 +40,7 @@ void test() {
 				"Name": (["type": "StrProperty", "value": "68 Crystal Oscillator"]),
 				"CategoryName": (["type": "StrProperty", "value": ""]),
 				"MapMarkerType": (["type": "EnumProperty", "subtype": "ERepresentationType", "value": "ERepresentationType::RT_MapMarker"]),
-				"IconID": (["type": "IntProperty", "value": 350]),
+				"IconID": (["type": "IntProperty", "value": 347]), //350 is the default "Home" icon, 347 is a crate
 				"Color": (["type": "StructProperty", "subtype": "LinearColor", "value": ({0x66/256.0, 0x33/256.0, 0x99/256.0, 1.0})]),
 				"Scale": (["type": "FloatProperty", "value": 1.0]),
 				"compassViewDistance": (["type": "EnumProperty", "subtype": "ECompassViewDistance", "value": "ECompassViewDistance::CVD_Off"]),
