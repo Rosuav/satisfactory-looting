@@ -23,7 +23,7 @@ class ObjectRef(string level, string path, int|void soft) {
 mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string path) {
 	mapping ret = ([]);
 	//ret->_raw = ((string)data)[..sizeof(data) - end - 1]; ret->_path = path; //HACK
-	//ret->_keyorder = ({ });
+	ret->_keyorder = ({ });
 	while (sizeof(data) > end) {
 		[string prop] = data->sscanf("%-4H");
 		if (prop == "None\0") break; //There MAY still be a type after that, but it won't be relevant. If there is, it'll be skipped in the END part.
@@ -54,7 +54,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 		}
 		else {
 			ret[prop - "\0"] = p;
-			//ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
+			ret->_keyorder += ({prop - "\0"}); //To ensure perfect round-tripping, sort the keys by original file order
 		}
 		int end;
 		if (type == "BoolProperty\0") {
@@ -512,8 +512,12 @@ string nt(string val) {
 void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 	//if (props->_raw) {dest->add(props->_raw); return;}
 	Stdio.Buffer dest = Stdio.Buffer();
-	foreach (props; string name; mapping p) if (name[0] != '_') { //Simplify, don't require the key order to be specified
-	//foreach (props->_keyorder, string name) {mapping p = props[name]; //Enforce output order for perfect round tripping
+	//Is the order of properties significant? The game itself seems to be fine with them in any order
+	//but SCIM struggles, sometimes failing to load, sometimes loading but with wrong results. Since it
+	//isn't TOO costly, we just retain order. Downside: If you add a property that wasn't in the save,
+	//eg if map markers had been omitted due to not having any, you have to add it to the key order too.
+	//foreach (props; string name; mapping p) if (name[0] != '_') { //Simplify, don't require the key order to be specified
+	foreach (props->_keyorder, string name) {mapping p = props[name]; //Enforce output order for perfect round tripping
 		foreach (p->type == "_repetition" ? p->values : ({p}), mapping p) {
 			dest->sprintf("%-4H%-4H", nt(name), nt(p->type));
 			object prop_size = buffer_size(dest, "%-4c");
