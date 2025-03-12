@@ -20,8 +20,46 @@ void test() {
 ]);
 	//~ parser->encode_properties(Stdio.Buffer(), props); return;
 	//~ mapping p = parser->parse_properties(Stdio.Buffer(props->_raw), 0, 0, ""); werror("Reparsed: %O\n", p); werror("Encoded: %O\n", parser->encode_properties(Stdio.Buffer(), p)); return;
-	mapping save = parser->cached_parse_savefile("Assembly First_autosave_2.sav");
-	write("Got save %O\n", indices(save->tree));
+	mapping save = parser->cached_parse_savefile("Assembly First_autosave_0.sav");
+	write("Got save %O\n", indices(save->tree->savefilebody));
+	foreach (save->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
+		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
+			mapping props = obj[-1]->prop;
+			mapping|zero marks = props->mMapMarkers;
+			//if (!marks) ... //TODO
+			write("mMapMarkers %O\n", marks->value->MarkerID->value);
+			mapping newmark = ([
+				"_type": "MapMarker",
+				"_keyorder": ({"MarkerID", "Location", "Name", "CategoryName", "MapMarkerType", "IconID", "Color", "Scale", "compassViewDistance"}),
+				"MarkerID": (["type": "ByteProperty", "subtype": "None"]),
+				"Location": (["type": "StructProperty", "subtype": "Vector_NetQuantize", "value": ([
+					"X": (["type": "DoubleProperty", "value": -34646.0]),
+					"Y": (["type": "DoubleProperty", "value": 117169.0]),
+					"Z": (["type": "DoubleProperty", "value": 21754.0]),
+					"_keyorder": ({"X", "Y", "Z"}),
+				])]),
+				"Name": (["type": "StrProperty", "value": "68 Crystal Oscillator"]),
+				"CategoryName": (["type": "StrProperty", "value": ""]),
+				"MapMarkerType": (["type": "EnumProperty", "subtype": "ERepresentationType", "value": "ERepresentationType::RT_MapMarker"]),
+				"IconID": (["type": "IntProperty", "value": 350]),
+				"Color": (["type": "StructProperty", "subtype": "LinearColor", "value": ({0x66/256.0, 0x33/256.0, 0x99/256.0, 1.0})]),
+				"Scale": (["type": "FloatProperty", "value": 1.0]),
+				"compassViewDistance": (["type": "EnumProperty", "subtype": "ECompassViewDistance", "value": "ECompassViewDistance::CVD_Off"]),
+			]);
+			int add = 1;
+			foreach (marks->value; int i; mapping mark) if (mark->MarkerID->value == 255) {
+				//Reuse an existing marker slot. I think this is safe?
+				newmark->MarkerID->value = i;
+				marks->value[i] = newmark;
+				add = 0;
+				break;
+			}
+			if (add) { //aka for-else
+				newmark->MarkerID->value = sizeof(marks->value);
+				marks->value += ({newmark});
+			}
+		}
+	}
 	string data = parser->reconstitute_savefile(save->tree);
 	Stdio.write_file(SATIS_SAVE_PATH + "/Reconstructed.sav", data);
 	//write("Reconstituted save has %d bytes\n", sizeof(data));
