@@ -126,6 +126,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 		} else if (type == "MapProperty\0") {
 			//Mapping types have two types (key and value)
 			[p->keytype, p->valtype, int zero] = data->sscanf("%-4H%-4H%c");
+			end = sizeof(data) - sz;
 			//write("GOT A MAP %O %O %O\n", path, p->keytype, p->valtype);
 			//if (sizeof(ret->_raw) < 2048) werror("Raw: %O\n", ret->_raw);
 		} else if (type == "StructProperty\0") {
@@ -576,7 +577,11 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 					prop_size->ref = sizeof(dest);
 					dest->sprintf("%-4H", nt(p->value));
 					break;
-				case "MapProperty": dest->sprintf("%-4H%-4H%c", p->keytype, p->valtype, 0); break; //The actual mapping will be in residue
+				case "MapProperty":
+					dest->sprintf("%-4H%-4H%c", p->keytype, p->valtype, 0);
+					prop_size->ref = sizeof(dest);
+					//The actual mapping will be in residue
+					break;
 				case "StructProperty": {
 					//Struct types have more padding
 					dest->sprintf("%-4H%17c", nt(p->subtype), 0);
@@ -628,7 +633,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 	if (props->_residue) dest->add(props->_residue);
 	if ((string)dest != props->_raw) {
 		string d = (string)dest, paired = String.common_prefix(({d, props->_raw}));
-		if (sizeof(d) > 1024) write("Encode failed for large [%d] object\n", sizeof(d)); else //Temporarily suppress the big ones
+		//if (sizeof(d) > 1024) write("Encode failed for large [%d] object\n", sizeof(d)); else //Temporarily suppress the big ones
 		write("Encode %O\nResult: [%3d] %O\nOrigin: [%3d] %O\nPaired: [%3d] %O\n",
 			props, sizeof(dest), (string)dest, sizeof(props->_raw), props->_raw,
 			sizeof(paired), paired,
