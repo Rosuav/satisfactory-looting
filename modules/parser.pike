@@ -97,10 +97,11 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 						}
 						//struct->_raw = ((string)data)[..sizeof(data) - end - 1];
 						switch (struct->_type) {
-							case "SpawnData": case "MapMarker": //A lot will be property lists
+							case "Vector": struct->value = data->sscanf("%-4F%-4F%-4F"); break;
+							case "LinearColor": struct->value = data->sscanf("%-4F%-4F%-4F%-4F"); break;
+							default: //A lot will be property lists
 								struct |= parse_properties(data, end, 1, path + " --> " + prop - "\0");
 								break;
-							default: break; //Unknown - just skip to the next one
 						}
 						arr += ({struct});
 						break;
@@ -133,12 +134,6 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 			p->subtype -= "\0";
 			end = sizeof(data) - sz;
 			switch (p->subtype) {
-				case "InventoryStack": case "Vector_NetQuantize": {
-					//The stack itself is a property list. But a StructProperty inside it has less padding??
-					//write("RAW INVENTORY %O\n", ((string)data)[..sizeof(data) - end - 1]);
-					p->value = parse_properties(data, end, 0, path + " --> " + prop - "\0");
-					break;
-				}
 				case "InventoryItem": {
 					[int padding, p->value, p->unk] = data->sscanf("%-4c%-4H%-4c");
 					break;
@@ -153,7 +148,18 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 					p->value = data->sscanf("%-8F%-8F%-8F");
 					break;
 				}
-				default: break;
+				case "Quat":
+				case "Box":
+				case "FluidBox":
+				case "RailroadTrackPosition":
+				case "DateTime":
+				case "ClientIdentityInfo":
+					//For now these can land in the residue
+					//werror("TODO: StructProperty %O\n", p->subtype);
+					break;
+				default:
+					p->value = parse_properties(data, end, 0, path + " --> " + prop - "\0");
+					break;
 			}
 			sz = sizeof(data) - end;
 		} else if (type == "IntProperty\0") {
@@ -545,10 +551,11 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 								struct_size->ref = sizeof(dest);
 							}
 							switch (elem->_type) {
-								case "SpawnData": case "MapMarker": //A lot will be property lists
+								case "Vector": dest->sprintf("%-4F%-4F%-4F", @elem->value); break;
+								case "LinearColor": dest->sprintf("%-4F%-4F%-4F%-4F", @elem->value); break;
+								default: //A lot will be property lists
 									encode_properties(dest, elem);
 									break;
-								default: break; //Unknown - the content should all be in the residue
 							}
 							break;
 						}
@@ -575,10 +582,6 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 					dest->sprintf("%-4H%17c", nt(p->subtype), 0);
 					prop_size->ref = sizeof(dest);
 					switch (p->subtype) {
-						case "InventoryStack": case "Vector_NetQuantize": {
-							encode_properties(dest, p->value);
-							break;
-						}
 						case "InventoryItem": {
 							dest->sprintf("%-4c%-4H%-4c", 0, p->value, p->unk);
 							break;
@@ -595,7 +598,17 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 							dest->sprintf("%-8F%-8F%-8F", @p->value);
 							break;
 						}
-						default: break;
+						case "Quat":
+						case "Box":
+						case "FluidBox":
+						case "RailroadTrackPosition":
+						case "DateTime":
+						case "ClientIdentityInfo":
+							//TODO as above, for now they come from residue
+							break;
+						default:
+							encode_properties(dest, p->value);
+							break;
 					}
 					break;
 				}
