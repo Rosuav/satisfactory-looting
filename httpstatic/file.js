@@ -1,5 +1,5 @@
 import {choc, replace_content, DOM} from "https://rosuav.github.io/choc/factory.js";
-const {DIV, FIGURE, H1, H2, IMG, LABEL, LI, OPTGROUP, OPTION, P, SELECT, STYLE, UL} = choc; //autoimport
+const {BUTTON, DIV, FIGURE, H1, H2, IMG, LABEL, LI, OPTGROUP, OPTION, P, SELECT, STYLE, UL} = choc; //autoimport
 
 set_content("main", [
 	H1("Satisfactory Looting - " + ws_group),
@@ -61,11 +61,13 @@ export function render(state) {
 }
 
 on("change", "select", update_image);
-function update_image() {
+function update_image(save) {
 	const refloc = DOM("#refloc option:checked").ref_coords;
 	const itemtype = DOM("#itemtype").value;
-	if (refloc && itemtype) ws_sync.send({cmd: "findloot", refloc, itemtype});
+	if (refloc && itemtype) ws_sync.send({cmd: "findloot", refloc, itemtype, save: save === 1});
 }
+
+on("click", "#save", e => update_image(1));
 
 export function sockmsg_findloot(msg) {
 	set_content("#searchresults", [
@@ -73,6 +75,7 @@ export function sockmsg_findloot(msg) {
 			msg.found.length ? msg.found.map(f => LI(f))
 			: LI("None found (savefile may have changed??)")
 		),
+		P(BUTTON({type: "button", id: "save"}, "Generate savefile")),
 		FIGURE([
 			IMG({src: msg.img}),
 			//FIGCAPTION("Do we need a caption?"),

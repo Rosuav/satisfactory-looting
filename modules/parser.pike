@@ -507,6 +507,9 @@ void annotate_find_loot(mapping savefile, Image.Image annot_map, array(float) lo
 		annot_map->line(basex, basey, x, y, 32, 64, 0);
 		add_map_marker(savefile, sprintf("%d %s", details[3], L10n(item)), details[0], details[1], details[2]);
 	}
+}
+
+void annotate_save(mapping savefile, Image.Image annot_map) {
 	Stdio.write_file(SATIS_SAVE_PATH + "/MapMarkersAdded.sav", reconstitute_savefile(savefile->tree));
 }
 
@@ -528,7 +531,7 @@ void annotate_autocrop(mapping savefile, Image.Image annot_map) {
 @export: mapping(string:mixed) annotate_map(mapping|string savefile, array annots) {
 	if (stringp(savefile)) savefile = low_parse_savefile(savefile); //Not using the cache so we have the option to mutate
 	savefile->annot_map = get_satisfactory_map();
-	foreach (annots, array anno) {
+	foreach (annots, array anno) if (anno) {
 		function func = this["annotate_" + anno[0]];
 		func(savefile, savefile->annot_map, @anno[1..]);
 	}

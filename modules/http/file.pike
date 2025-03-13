@@ -37,6 +37,7 @@ mapping websocket_cmd_findloot(mapping(string:mixed) conn, mapping(string:mixed)
 	mapping savefile = annotate_map(conn->group, ({
 		({"find_loot", loc, msg->itemtype}),
 		({"autocrop"}),
+		msg->save && ({"save"}),
 	}));
 
 	return ([
