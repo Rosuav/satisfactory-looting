@@ -394,6 +394,46 @@ mapping low_parse_savefile(string fn) {
 	return ret;
 }
 
+void add_map_marker(mapping savefile, string label, float x, float y, float z) {
+	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
+		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
+			mapping props = obj[-1]->prop;
+			mapping|zero marks = props->mMapMarkers;
+			if (!marks) return; //TODO
+			mapping newmark = ([
+				"_type": "MapMarker",
+				"_keyorder": ({"MarkerID", "Location", "Name", "CategoryName", "MapMarkerType", "IconID", "Color", "Scale", "compassViewDistance"}),
+				"MarkerID": (["type": "ByteProperty", "subtype": "None"]),
+				"Location": (["type": "StructProperty", "subtype": "Vector_NetQuantize", "value": ([
+					"X": (["type": "DoubleProperty", "value": x]),
+					"Y": (["type": "DoubleProperty", "value": y]),
+					"Z": (["type": "DoubleProperty", "value": z]),
+					"_keyorder": ({"X", "Y", "Z"}),
+				])]),
+				"Name": (["type": "StrProperty", "value": label]),
+				"CategoryName": (["type": "StrProperty", "value": ""]),
+				"MapMarkerType": (["type": "EnumProperty", "subtype": "ERepresentationType", "value": "ERepresentationType::RT_MapMarker"]),
+				"IconID": (["type": "IntProperty", "value": 347]), //350 is the default "Home" icon, 347 is a crate
+				"Color": (["type": "StructProperty", "subtype": "LinearColor", "value": ({0x66/256.0, 0x33/256.0, 0x99/256.0, 1.0})]),
+				"Scale": (["type": "FloatProperty", "value": 1.0]),
+				"compassViewDistance": (["type": "EnumProperty", "subtype": "ECompassViewDistance", "value": "ECompassViewDistance::CVD_Off"]),
+			]);
+			int add = 1;
+			foreach (marks->value; int i; mapping mark) if (mark->MarkerID->value == 255) {
+				//Reuse an existing marker slot. I think this is safe?
+				newmark->MarkerID->value = i;
+				marks->value[i] = newmark;
+				add = 0;
+				break;
+			}
+			if (add) { //aka for-else
+				newmark->MarkerID->value = sizeof(marks->value);
+				marks->value += ({newmark});
+			}
+		}
+	}
+}
+
 array(int) coords_to_pixels(array(float) pos) {
 	//To convert in-game coordinates to pixel positions:
 	//1) Rescale from 750000.0,750000.0 to 5000,5000 (TODO: Adjust if the map coords are wrong)
@@ -465,7 +505,9 @@ void annotate_find_loot(mapping savefile, Image.Image annot_map, array(float) lo
 		annot_map->circle(x, y, 4, 4, 128, 192, 0);
 		annot_map->circle(x, y, 3, 3, 128, 192, 0);
 		annot_map->line(basex, basey, x, y, 32, 64, 0);
+		add_map_marker(savefile, sprintf("%d %s", details[3], L10n(item)), details[0], details[1], details[2]);
 	}
+	Stdio.write_file(SATIS_SAVE_PATH + "/MapMarkersAdded.sav", reconstitute_savefile(savefile->tree));
 }
 
 //TODO: Other map annotation types:
@@ -484,7 +526,7 @@ void annotate_autocrop(mapping savefile, Image.Image annot_map) {
 }
 
 @export: mapping(string:mixed) annotate_map(mapping|string savefile, array annots) {
-	if (stringp(savefile)) savefile = cached_parse_savefile(savefile) | ([]);
+	if (stringp(savefile)) savefile = low_parse_savefile(savefile); //Not using the cache so we have the option to mutate
 	savefile->annot_map = get_satisfactory_map();
 	foreach (annots, array anno) {
 		function func = this["annotate_" + anno[0]];
