@@ -169,5 +169,5 @@ protected void create(string name)
 		if (object http = m_delete(G->G, "httpserver")) catch {http->close();};
 	}
 	if (G->G->notify_mainsock) G->G->notify_mainsock->set_accept_callback(sock_connected);
-	else (G->G->notify_mainsock = Stdio.Port())->bind(1821, sock_connected, "::", 1); //TODO: Switch port to 1444 to complete the migration (part 1)
+	else (G->G->notify_mainsock = Stdio.Port())->bind(1444, sock_connected, "::", 1); //TODO: Switch port to 1444 to complete the migration (part 1)
 }
