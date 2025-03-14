@@ -151,7 +151,7 @@ void websocket_cmd_fleetpower(mapping conn, mapping data) {
 }
 
 void websocket_cmd_goto(mapping conn, mapping data) {
-	indices(G->notifiers)->provnotify(data->tag, (int)data->province);
+	indices(G->G->notifiers)->provnotify(data->tag, (int)data->province);
 }
 
 void websocket_cmd_pin(mapping conn, mapping data) {
@@ -185,7 +185,7 @@ void websocket_cmd_cyclenext(mapping conn, mapping data) {
 	[int id, array rest] = Array.shift(G->G->provincecycle[country]);
 	G->G->provincecycle[country] = rest + ({id});
 	send_updates_all(country);
-	indices(G->notifiers)->provnotify(data->tag, (int)id);
+	indices(G->G->notifiers)->provnotify(data->tag, (int)id);
 }
 
 void websocket_cmd_search(mapping conn, mapping data) {
