@@ -27,6 +27,15 @@ string group_to_tag(mapping data, string tag) {
 	return tag;
 }
 
+//Find the player who is piloting this tag. Null if there is none. If this returns a
+//non-null value, group_to_tag() on that value should return the original tag.
+string|zero tag_to_player(mapping data, string tag) {
+	if (data->players_countries) {
+		foreach (data->players_countries / 2, [string name, string trytag])
+			if (tag == trytag) return name;
+	}
+}
+
 //Note that a "tag" might actually be an alias such as a username.
 //Preferences stored on a user will be applied to whichever tag that user is
 //controlling presently, and will travel with the user.
@@ -36,6 +45,7 @@ mapping tag_prefs(string tag) {
 }
 
 mapping get_state(string group) {
+	if (has_prefix(group, "notify-")) return ([]); //No state needed for notification sockets
 	mapping data = G->G->last_parsed_savefile;
 	if (G->G->error) return (["error": G->G->error]);
 	if (!data) return (["error": "Processing savefile... "]);
@@ -150,8 +160,15 @@ void websocket_cmd_fleetpower(mapping conn, mapping data) {
 	persist_save(); send_updates_all(conn->group);
 }
 
+void provnotify(string tag, int prov) {
+	indices(G->G->notifiers)->provnotify(tag, prov); //Legacy notifiers
+	send_updates_all("notify-" + tag, (["prov": prov]));
+	if (string player = tag_to_player(G->G->last_parsed_savefile, tag))
+		send_updates_all("notify-" + player, (["prov": prov]));
+}
+
 void websocket_cmd_goto(mapping conn, mapping data) {
-	indices(G->G->notifiers)->provnotify(data->tag, (int)data->province);
+	provnotify(data->tag, (int)data->province);
 }
 
 void websocket_cmd_pin(mapping conn, mapping data) {
@@ -185,7 +202,7 @@ void websocket_cmd_cyclenext(mapping conn, mapping data) {
 	[int id, array rest] = Array.shift(G->G->provincecycle[country]);
 	G->G->provincecycle[country] = rest + ({id});
 	send_updates_all(country);
-	indices(G->G->notifiers)->provnotify(data->tag, (int)id);
+	provnotify(data->tag, (int)id);
 }
 
 void websocket_cmd_search(mapping conn, mapping data) {
