@@ -739,7 +739,10 @@ log = \"PROV-TERRAIN-END\"
 		//hence it's simpler to not cache province info in the same cache file.
 
 		G->G->error = gather_province_info();
-		if (G->G->error) active_mods = 0; //Flag ourselves as not safe to analyze with
+		if (G->G->error) {
+			werror("PROVINCE INFO GATHERING ERROR %O\n", G->G->error);
+			active_mods = 0; //Flag ourselves as not safe to analyze with
+		}
 	}
 }
 //Should be sufficient to prevent anything from crashing. Note that NullGameConfig()->active_mods
@@ -836,7 +839,18 @@ void parser_pipe_msg(object pipe, string msg) {
 			if (!data) {werror("Unable to parse save file (see above for errors, hopefully)\n"); return;}
 			write("\nCurrent date: %s\n", data->date);
 			array mods = (data->mods_enabled_names||({}))->filename;
+			//Do some quick checks to see if it's likely that edit files have been changed
+			//1. If you've added or removed mods, clearly it's not compatible.
 			if (mods * "," != G->CFG->active_mods) G->CFG = GameConfig(mods);
+			//2. If you've edited a file, chances are it's not compatible.
+			else {
+				string fast = calculate_checksum(mods, 1);
+				if (fast != G->CFG->fast_hash) {
+					if (calculate_checksum(mods) != G->CFG->hash) G->CFG = GameConfig(mods);
+					else G->CFG->fast_hash = fast; //If the main hash is the same, update the fast hash, since it's clearly compatible.
+				}
+			}
+			//3. Anything else?
 			foreach (data->countries; string tag; mapping c) {
 				c->tag = tag; //When looking at a country, it's often convenient to know its tag (reverse linkage).
 				c->owned_provinces = Array.arrayify(c->owned_provinces); //Several things will crash if you don't have a provinces array
