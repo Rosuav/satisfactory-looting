@@ -310,7 +310,7 @@ class GameConfig {
 		
 		and repeat for each terrain type. A technique others have done is to cede the provinces to different countries,
 		save, and parse the savefile; this is slow, messy, and mutates the save, so it won't be very useful in Random
-		New World. (Not that I'm going to try to support RNW, but it should be easier this way if I do in the future.)
+		New World. (Not that I intend to try to support RNW, but it should be easier this way if I do in the future.)
 
 		Since we can't do it the easy way, let's do it the hard way instead. For each province ID, for each terrain, if
 		the province has that terrain, log a message. If it's stupid, but it works........ no, it's still stupid.
