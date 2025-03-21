@@ -410,6 +410,7 @@ log = \"PROV-TERRAIN-END\"
 		}
 		config_dirs = find_mod_directories(mod_filenames);
 		active_mods = mod_filenames * ",";
+		werror("Loading EU4 config for mods %O\n", active_mods);
 		mapping gfx = low_parse_savefile("/interface/core.gfx");
 		//There might be multiple bitmapfonts entries. Logically, I think they should just be merged? Not sure.
 		//It seems that only one of them has the textcolors block that we need.
