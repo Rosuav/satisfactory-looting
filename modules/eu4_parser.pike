@@ -191,9 +191,12 @@ array list_config_dir(array(string) config_dirs, string dir) {
 	return files[filenames[*]];
 }
 
-void update_checksum(object hash, array(string) dirs, string dir, string tail, int recurse) {
+void update_checksum(object|mapping hash, array(string) dirs, string dir, string tail, int recurse) {
 	foreach (list_config_dir(dirs, "/" + dir), string fn)
-		if (has_suffix(fn, tail)) hash->update(Stdio.read_file(fn));
+		if (has_suffix(fn, tail)) {
+			if (hash->update) hash->update(Stdio.read_file(fn));
+			if (hash->mtime) hash->mtime = max(hash->mtime, file_stat(fn)->mtime);
+		}
 	if (recurse) {
 		//Enumerate directories to search for by examining the main program files,
 		//assumed to be the first in the list of directories.
@@ -203,7 +206,7 @@ void update_checksum(object hash, array(string) dirs, string dir, string tail, i
 	}
 }
 
-string calculate_checksum(array(string) mod_filenames) {
+string calculate_checksum(array(string) mod_filenames, int|void fast) {
 	array dirs = find_mod_directories(mod_filenames);
 	mapping manifest = parse_eu4txt(Stdio.read_file(EU4_PROGRAM_PATH + "/checksum_manifest.txt"));
 	//The hash stored in the EU4 files is the right length for MD5. However, simply using MD5
@@ -212,25 +215,31 @@ string calculate_checksum(array(string) mod_filenames) {
 	//included in the hash, or it might be something else entirely. Fortunately I don't need
 	//to perfectly match the hash (it would be nice, but it's not vital); I can just update
 	//everything any time I see a change.
+	//NOTE: The above comment implies that there is a hash in the EU4 files, but the only one
+	//that I can find as of 20250321 is a checksum on the save, NOT on the files. There does
+	//appear to be a 128-bit checksum buried in the eu4 binary, whose last four digits are the
+	//published checksum for Ironman, but I have not seen a way to query the checksum used by
+	//the system as of a particular savefile.
 	//object hash = Crypto.MD5();
-	object hash = Crypto.SHA1(); //Nearly as fast as MD5 and probably a better choice. SHA256 is safer but unnecessary, and a lot slower.
+	object|mapping hash =
+		fast ? (["mtime": 1]) //Just get the timestamp. Incredibly fast but has no real meaning. Can be used prior to calculating the actual checksum.
+		: Crypto.SHA1(); //Nearly as fast as (or even faster than!) MD5 and probably a better choice. SHA256 is safer but unnecessary, and a lot slower.
 	foreach (manifest->directory, mapping dir)
 		update_checksum(hash, dirs, dir->name, dir->file_extension, dir->sub_directories);
+	if (fast) return (string)hash->mtime;
 	return sprintf("%@02x", (array)hash->digest());
 }
 
 //The current instance of this class is available as G->CFG
 class GameConfig {
 	//Everything in this class affects the EU4 checksum. Mods can change the underlying
-	//files parsed into this data. It may be of value to cache these objects (it takes
-	//about 3-4 seconds to do the full parse), but maybe only in memory, not in JSON.
-	//If such a cache is created, it should also reference the game version somehow.
-	//A save file has a 'checksum' attribute, but how do we know what matches that?
-	//Maybe what we should do is build our own checksum based on the same files that the
-	//game does, as listed in checksum_manifest.txt? It wouldn't matter if the hash isn't
-	//the same as the game's one, as long as it changes whenever the game's hash changes.
+	//files parsed into this data.
+	//Note that there are three hashes stored: the regular and vanilla, which are content
+	//checksums with and without mods; and the fast hash, which is highly likely to change
+	//when the content changes, but could easily change without a content change. It is
+	//currently the modification time of the newest file that would be hashed.
 	string active_mods; //Comma-separated signature string of all active mods. Might need game version too?
-	string hash, vanilla_hash; //Not necessarily the same hash that the game uses, but derived from all the same files
+	string hash, vanilla_hash, fast_hash; //Not necessarily the same hash that the game uses, but derived from all the same files
 	array config_dirs;
 	mapping icons = ([]), textcolors = ([]), map_areas = ([]), map_regions = ([]);
 	mapping prov_area = ([]), area_region = ([]), prov_colonial_region = ([]), prov_continent = ([]), region_superregion = ([]);
@@ -712,6 +721,7 @@ log = \"PROV-TERRAIN-END\"
 			}
 		}
 
+		fast_hash = calculate_checksum(mod_filenames, 1);
 		hash = calculate_checksum(mod_filenames);
 		if (!sizeof(mod_filenames)) vanilla_hash = hash;
 		else vanilla_hash = calculate_checksum(({ }));
