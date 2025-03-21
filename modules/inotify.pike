@@ -107,10 +107,42 @@ void watch_game_log(object inot) {
 	log->set_nonblocking();
 	string data = "";
 	G->G->recent_peace_treaties = G->G->war_rumours = ({ });
+	mapping parsing_prov_terrain, all_maps;
 	void parse() {
 		data += log->read();
 		while (sscanf(data, "%s\n%s", string line, data)) {
 			line = String.trim(line);
+			if (sscanf(line, "[effectimplementation.cpp:%*d]: EVENT [%*[0-9.]]:PROV-TERRAIN%[-A-Z]: %s", string type, string line) && line) {
+				//It's the result of running prov.txt. Parse it out, then reconstruct G->CFG.
+				switch (type) {
+					case "-BEGIN": {
+						werror("Starting province parsing... %O\n", line);
+						all_maps = Standards.JSON.decode(Stdio.read_file("maps.json") || "{}");
+						if (!all_maps[line]) parsing_prov_terrain = all_maps[line] = ([]);
+						break;
+					}
+					case "": {
+						if (!parsing_prov_terrain) break;
+						//Lines look like this:
+						//[effectimplementation.cpp:21960]: EVENT [1444.11.11]:PROV-TERRAIN: drylands 224 - Sevilla
+						sscanf(line, "%d %s=%s", int provid, string key, string val);
+						if (!provid) break;
+						mapping pt = parsing_prov_terrain[(string)provid] || ([]); parsing_prov_terrain[(string)provid] = pt;
+						pt[key] = String.trim(val);
+						break;
+					}
+					case "-ERROR": break; //TODO
+					case "-END": {
+						if (!parsing_prov_terrain) break;
+						werror("Province parsing complete.\n");
+						Stdio.write_file("maps.json", Standards.JSON.encode(all_maps));
+						parsing_prov_terrain = 0;
+						G->CFG = object_program(G->CFG)(); //Trigger a reconstruction. Another will likely follow if the save doesn't use the current mods.
+						break;
+					}
+					default: break; //Shouldn't happen
+				}
+			}
 			if (!sscanf(line, "[messagehandler.cpp:%*d]: %s", line)) continue;
 			mapping sendme = (["cmd": "update"]);
 			if (has_value(line, "accepted peace")) { //TODO: Make sure this filters out any that don't belong, like some event choices

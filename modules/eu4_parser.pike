@@ -371,28 +371,10 @@ every_province = {
 	limit = { check_variable = { which = terrain_reported value = 0 } is_wasteland = no }
 	log = \"PROV-TERRAIN-ERROR: Terrain not reported for province [This.GetName]\"
 }
-log = \"PROV-TERRAIN-END\"
+log = \"PROV-TERRAIN-END: requested at " + time() + #"\"
 ");
 			script->close();
-			//See if the script's already been run (yes, we rebuild the script every time - means you
-			//can rerun it in case there've been changes), and if so, parse and save the data.
-			string log = Stdio.read_file(EU4_LOCAL_PATH + "/logs/game.log") || "";
-			if (!has_value(log, "PROV-TERRAIN-BEGIN") || !has_value(log, "PROV-TERRAIN-END"))
-				return "Please open up EU4 and, in the console, type: run prov.txt";
-			string terrain = ((log / "PROV-TERRAIN-BEGIN")[-1] / "PROV-TERRAIN-END")[0];
-			sscanf(terrain, ": %s\n", string loghash); //The BEGIN line should have the hash in it
-			if (String.trim(loghash) != hash)
-				return "Hash inconsistent! Please open up EU4 and, in the console, type: run prov.txt";
-			province_info = all_maps[hash] = ([]);
-			foreach (terrain / "\n", string line) {
-				//Lines look like this:
-				//[effectimplementation.cpp:21960]: EVENT [1444.11.11]:PROV-TERRAIN: drylands 224 - Sevilla
-				sscanf(line, "%*sPROV-TERRAIN: %d %s=%s", int provid, string key, string val);
-				if (!provid) continue;
-				mapping pt = province_info[(string)provid] || ([]); province_info[(string)provid] = pt;
-				pt[key] = String.trim(val);
-			}
-			Stdio.write_file("maps.json", Standards.JSON.encode(all_maps));
+			return "Please open up EU4 and, in the console, type: run prov.txt";
 		}
 		foreach (province_info; string id; mapping provinfo) {
 			mapping terraininfo = terrain_definitions->categories[provinfo->terrain];
