@@ -316,7 +316,6 @@ section("decisions_missions", "", "Decisions and Missions", state => [
 ]);
 
 section("cot", "CoTs", "Centers of Trade", state => {
-	max_interesting.cot = state.cot.maxinteresting;
 	const content = [SUMMARY(`Centers of Trade (${state.cot.level3}/${state.cot.max} max level)`), proventer("cot")];
 	for (let kwd of ["upgradeable", "developable"]) {
 		const cots = state.cot[kwd];
@@ -324,7 +323,7 @@ section("cot", "CoTs", "Centers of Trade", state => {
 		//TODO: Make sortable() able to handle a pre-heading row that's part of the THEAD
 		content.push(TABLE({id: kwd, border: "1"}, [
 			TR(TH({colSpan: 5}, [proventer(kwd), `${kwd[0].toUpperCase()}${kwd.slice(1)} CoTs:`])),
-			cots.map(cot => TR({className: "interesting" + cot.interesting}, [
+			cots.map(cot => TR([
 				TD(PROV(cot.id, cot.name)),
 				TD([
 					province_info[cot.id].has_port

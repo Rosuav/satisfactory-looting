@@ -28,7 +28,7 @@ void analyze_cot(mapping data, string name, string tag, mapping write) {
 	int maxlevel3 = sizeof(Array.arrayify(country->merchants->?envoy)); //You can have as many lvl 3 CoTs as you have merchants.
 	int level3 = sizeof(maxlvl); //You might already have some.
 	int maxprio = 0;
-	string|mapping colorize(string color, array info, int prio) {
+	string|mapping colorize(string color, array info) {
 		//Colorize if it's interesting. It can't be upgraded if not in a state; also, not all level 2s
 		//can become level 3s, for various reasons.
 		[string key, string cotlevel, string id, int dev, string provname, string tradenode] = info;
@@ -39,19 +39,17 @@ void analyze_cot(mapping data, string name, string tag, mapping write) {
 			if (area_has_level3[G->CFG->prov_area[id]]) noupgrade = "other l3 in area";
 			else if (++level3 > maxlevel3) noupgrade = "need merchants";
 		}
-		if (!noupgrade) maxprio = max(prio, maxprio);
 		return ([
 			"id": id, "dev": dev, "name": provname, "tradenode": tradenode,
 			"noupgrade": noupgrade || "",
-			"level": (int)cotlevel, "interesting": !noupgrade && prio,
+			"level": (int)cotlevel,
 		]);
 	}
 	write->cot = ([
 		"level3": level3, "max": maxlevel3,
-		"upgradeable": colorize("", upgradeable[*], 2),
-		"developable": colorize("", developable[*], 1),
+		"upgradeable": colorize("", upgradeable[*]),
+		"developable": colorize("", developable[*]),
 	]);
-	write->cot->maxinteresting = maxprio;
 }
 
 object calendar(string date) {
