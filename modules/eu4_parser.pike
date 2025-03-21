@@ -740,7 +740,7 @@ log = \"PROV-TERRAIN-END\"
 
 		G->G->error = gather_province_info();
 		if (G->G->error) {
-			werror("PROVINCE INFO GATHERING ERROR %O\n", G->G->error);
+			werror("\e[1;31m%s\e[0m\n", G->G->error);
 			active_mods = 0; //Flag ourselves as not safe to analyze with
 		}
 	}
