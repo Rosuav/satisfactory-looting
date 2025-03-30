@@ -12,4 +12,6 @@ void help() {
 void test() {
 	object parser = G->bootstrap("modules/parser.pike");
 	program ObjectRef = parser->ObjectRef;
+	mapping savefile = parser->low_parse_savefile("Assembly First_autosave_1.sav");
+	//TODO: Delve into the fog of war, what can we learn? Can we get an exploration progress status?
 }
