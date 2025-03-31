@@ -4,10 +4,12 @@ protected void create(string n)
 	foreach (Program.annotations(this_program); string anno;)
 		if (stringp(anno) && sscanf(anno, "G->G->%s", string gl) && gl)
 			if (!G->G[gl]) G->G[gl] = ([]);
+	load_satisfactory_l10n("en-US");
 }
 
 //TODO: Figure out a way to ask Steam where a game is installed, and what the active user is
 constant SATIS_SAVE_PATH = "../.steam/steam/steamapps/compatdata/526870/pfx/drive_c/users/steamuser/Local Settings/Application Data/FactoryGame/Saved/SaveGames/76561198043731689";
+constant SATIS_PROGRAM_PATH = "../.steam/steamapps/common/Satisfactory";
 constant EU4_LOCAL_PATH = "../.local/share/Paradox Interactive/Europa Universalis IV";
 //constant EU4_SAVE_PATH = LOCAL_PATH + "/save games"; //Not actually a constant
 constant EU4_PROGRAM_PATH = "../.steam/steam/steamapps/common/Europa Universalis IV"; //Append /map or /common etc to access useful data files
@@ -27,46 +29,30 @@ void persist_save() {
 	Stdio.write_file(CONFIG_FILE, Standards.JSON.encode(persist, 5));
 }
 
-//Can this be loaded from a localization file or something?
-constant ITEM_NAMES = ([
-	"Desc_AluminumPlateReinforced_C": "Heat Sink",
-	"Desc_AluminumPlate_C": "Alclad Aluminum Sheet",
-	"Desc_Biofuel_C": "Solid Biofuel",
-	"Desc_CartridgeSmart_C": "Rifle Smartridge",
-	"Desc_CartridgeStandard_C": "Rifle Ammo",
-	"Desc_Cement_C": "Concrete",
-	"Desc_ComputerSuper_C": "Supercomputer",
-	"Desc_Filter_C": "Gas Filter",
-	"Desc_Fuel_C": "Packaged Fuel",
-	"Desc_HighSpeedConnector_C": "High-Speed Connector",
-	"Desc_HighSpeedWire_C": "Quickwire",
-	"Desc_IronPlateReinforced_C": "Reinforced Iron Plate",
-	"Desc_IronScrew_C": "Screw",
-	"Desc_Medkit_C": "Medicinal Inhaler",
-	"Desc_ModularFrameFused_C": "Fused Modular Frame",
-	"Desc_ModularFrameHeavy_C": "Heavy Modular Frame",
-	"Desc_MotorLightweight_C": "Turbo Motor",
-	"Desc_NobeliskCluster_C": "Cluster Nobelisk",
-	"Desc_NobeliskExplosive_C": "Nobelisk",
-	"Desc_NobeliskGas_C": "Gas Nobelisk",
-	"Desc_NobeliskShockwave_C": "Pulse Nobelisk",
-	"Desc_PackagedBiofuel_C": "Packaged Liquid Biofuel",
-	"Desc_Rebar_Explosive_C": "Explosive Rebar",
-	"Desc_Rebar_Spreadshot_C": "Shatter Rebar",
-	"Desc_Rebar_Stunshot_C": "Stun Rebar",
-	"Desc_SpikedRebar_C": "Iron Rebar",
-	"Desc_SteelPlateReinforced_C": "Encased Industrial Beam",
-	"Desc_SteelPlate_C": "Steel Beam",
-	"Desc_TurboFuel_C": "Packaged Turbofuel",
-	"BP_EquipmentDescriptorJumpingStilts_C": "Blade Runners",
-	"BP_EquipmentDescriptorShockShank_C": "Xeno-Zapper",
-	"BP_EquipmentDescriptorStunSpear_C": "Xeno-Basher",
-]);
+void load_satisfactory_l10n(string lang) {
+	//Is this always present?
+	string fn = SATIS_PROGRAM_PATH + "/CommunityResources/Docs/" + lang + ".json";
+	//The l10n files are stored in UTF-16. For some reason.
+	//The file consists of an array of native classes and their corresponding collections
+	//of internal classes. We don't care about the distinctions and will just map an
+	//internal class name to its display name.
+	array natives = Standards.JSON.decode(unicode_to_string(Stdio.read_file(fn)));
+	mapping l10n = G->G->satis_l10n = ([
+		//Special-case anything that isn't in the files themselves.
+		"Desc_CartridgeSmart_C": "Rifle Smartridge",
+	]);
+	foreach (natives, mapping native) {
+		//native->NativeClass is the path to the native class
+		foreach (native->Classes, mapping cls) {
+			l10n[cls->ClassName] = cls->mDisplayName;
+			//There's a bunch of other info too, which might be useful for colorization.
+		}
+	}
+}
 
 string L10n(string id) {
-	if (ITEM_NAMES[id]) return ITEM_NAMES[id];
-	sscanf(id, "Desc_%s_C", id);
-	return String.trim(Regexp.SimpleRegexp("[A-Z][a-z]+")->replace(id) {return __ARGS__[0] + " ";});
+	if (!G->G->satis_l10n) load_satisfactory_l10n("en-US");
+	return G->G->satis_l10n[id] || id;
 }
 
 //Handle potentially-asynchronous results. Can be used to paper over a distinction between
