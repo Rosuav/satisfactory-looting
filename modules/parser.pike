@@ -549,6 +549,12 @@ void annotate_fogmask(mapping savefile, Image.Image annot_map) {
 			//In order to render the fog more accurately, we will need either a heightmap at
 			//750000x750000 resolution, or one at 5000x5000. Either way, iterate over that,
 			//and then find the correct cell to look up.
+			//Fun fact: In FGMapManager.h (check CommunityResources/Headers.zip), the FOWData
+			//class has centerPoint, radius, gradientHeightModifier, and useGradientFalloff.
+			//Sounds like the savefile stores the height mod, but the others are predictable
+			//(presumably the centerPoint is on the grid, and the radius is constant). Would
+			//be very interesting to see how they correlate. It also has private members
+			//mFogOfWarDataSize and mFogOfWarResolution, which might be interesting.
 			foreach (fog / 512; int r; array row) {
 				int y1 = r * 5000 / 512, y2 = (r + 1) * 5000 / 512 - 1;
 				foreach (row; int c; string cell) {
