@@ -28,9 +28,14 @@ void walk(mixed tree, string path, function handler) {
 void test() {
 	object parser = G->bootstrap("modules/parser.pike");
 	program ObjectRef = parser->ObjectRef;
-	mapping savefile = parser->low_parse_savefile("Assembly First_autosave_1.sav");
-	Image.Image img = parser->annotate_map(savefile, ({
-		({"fogmask"}),
-	}))->annot_map;
-	Stdio.write_file("map.png", Image.PNG.encode(img));
+	mapping savefile = parser->low_parse_savefile("asdf.sav");
+	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
+		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
+			werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);
+			//We can see that player X has highlighted marker Y, but X and Y are given as
+			//object references. The map markers themselves (obj[-1]->prop->mMapMarkers)
+			//do not seem to have their reference IDs. Have we already thrown those away
+			//at an earlier phase of parsing?
+		}
+	}
 }
