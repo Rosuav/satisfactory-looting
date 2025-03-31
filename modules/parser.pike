@@ -529,6 +529,39 @@ void annotate_autocrop(mapping savefile, Image.Image annot_map) {
 	);
 }
 
+void annotate_fogmask(mapping savefile, Image.Image annot_map) {
+	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
+		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
+			array fog = (string)obj[-1]->prop->mFogOfWarRawData->value / 4.0;
+			//Each entry in fog[] is a four-byte string representing one unit.
+			//There are a total of 262144 such units, giving a resolution of 512x512.
+			//Note that every string appears to be of the form "\0\0%c\377", which might
+			//indicate that the blue channel is the only one carrying information, or that
+			//it's stored in HSVA with the hue and saturation permanently at zero and the
+			//alpha permanently full.
+			//The thickness of the fog is stored per cell, with each cell being worth about
+			//10x10 pixels on the map or 14-15 meters. However, the in-game map does not
+			//look blocky to that extent. Current hypothesis: There is a height map for the
+			//actual world (which is static), and any time the fog is lower than the height
+			//of that point on the world, it is in fog. (Imagine that the fog is a low-lying
+			//cloud, or something. I dunno.) The SCIM has a depth map at the same 512x512
+			//that the fog itself is stored at, giving it a very blocky appearance.
+			//In order to render the fog more accurately, we will need either a heightmap at
+			//750000x750000 resolution, or one at 5000x5000. Either way, iterate over that,
+			//and then find the correct cell to look up.
+			foreach (fog / 512; int r; array row) {
+				int y1 = r * 5000 / 512, y2 = (r + 1) * 5000 / 512 - 1;
+				foreach (row; int c; string cell) {
+					int x1 = c * 5000 / 512, x2 = (c + 1) * 5000 / 512 - 1;
+					int visibility = cell[2];
+					//Arbitrary threshold for testing
+					if (visibility < 150) annot_map->box(x1, y1, x2, y2, 0, 0, 0);
+				}
+			}
+		}
+	}
+}
+
 @export: mapping(string:mixed) annotate_map(mapping|string savefile, array annots) {
 	if (stringp(savefile)) savefile = low_parse_savefile(savefile); //Not using the cache so we have the option to mutate
 	savefile->annot_map = get_satisfactory_map();

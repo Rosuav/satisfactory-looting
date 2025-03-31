@@ -29,8 +29,8 @@ void test() {
 	object parser = G->bootstrap("modules/parser.pike");
 	program ObjectRef = parser->ObjectRef;
 	mapping savefile = parser->low_parse_savefile("Assembly First_autosave_1.sav");
-	//TODO: Delve into the fog of war, what can we learn? Can we get an exploration progress status?
-	walk(savefile, "savefile") {[mixed node, string path] = __ARGS__;
-		if (mappingp(node) && node->mFogOfWarRawData) write("%s->mFogOfWarRawData: %O\n", path, node);
-	};
+	Image.Image img = parser->annotate_map(savefile, ({
+		({"fogmask"}),
+	}))->annot_map;
+	Stdio.write_file("map.png", Image.PNG.encode(img));
 }
