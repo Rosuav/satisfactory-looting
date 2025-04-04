@@ -388,7 +388,7 @@ mapping low_parse_savefile(string fn) {
 	ret->total_loot = ({ });
 	foreach (haveloot; string id; mapping locs)
 		ret->total_loot += ({({id, L10n(id), `+(@values(locs))})});
-	sort(ret->total_loot[*][0], ret->total_loot);
+	sort(ret->total_loot[*][1], ret->total_loot);
 
 	//------------- Do some translations and tidyups for convenience -------------//
 	array markers = ({ });
