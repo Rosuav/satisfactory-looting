@@ -28,7 +28,12 @@ void walk(mixed tree, string path, function handler) {
 void test() {
 	object parser = G->bootstrap("modules/parser.pike");
 	program ObjectRef = parser->ObjectRef;
-	mapping savefile = parser->low_parse_savefile("asdf.sav");
+	if (1) {
+		write("------ Stable ------\n");
+		parser->low_parse_savefile("Assembly First_autosave_1.sav");
+	}
+	write("------ Mental ------\n");
+	mapping savefile = parser->low_parse_savefile("Mental_autosave_0.sav");
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
 		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
 			werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);
