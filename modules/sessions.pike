@@ -8,6 +8,8 @@ inherit annotated;
 @retain: mapping(string:string) file_sessions = ([]);
 
 void load_sessions() {
+	System.Timer tm = System.Timer();
+	werror("Loading sessions...\n");
 	foreach (glob("*.sav", get_dir(SATIS_SAVE_PATH)), string fn) {
 		mapping savefile = cached_parse_savefile(fn);
 		string s = savefile->session; if (!s) continue; //File has vanished, or can't be parsed
@@ -15,6 +17,7 @@ void load_sessions() {
 		session_mtimes[s][fn] = savefile->mtime;
 		file_sessions[fn] = s;
 	}
+	werror("%d sessions (%d files) loaded in %.3fs.\n", sizeof(session_mtimes), sizeof(file_sessions), tm->peek());
 }
 
 @inotify_hook: void savefile_changed(string cat, string fn) {
