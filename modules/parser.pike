@@ -206,8 +206,10 @@ mapping low_parse_savefile(string fn) {
 	//https://satisfactory.wiki.gg/wiki/Save_files
 	//mapname is always "Persistent_Level"; sessname is what the user entered to describe the session.
 	mapping tree = ret->tree = ([]); //Everything needed to reconstruct the original savefile.
-	[int ver1, int ver2, int build, string mapname, string params, string sessname, int playtime] = tree->header = data->sscanf("%-4c%-4c%-4c%-4H%-4H%-4H%-4c");
+	[int ver1, int ver2, int build] = tree->header = data->sscanf("%-4c%-4c%-4c");
 	if (ver1 < 13) return ret; //There seem to be some differences with really really old savefiles
+	if (ver1 >= 14) [tree->savename] = data->sscanf("%-4H");
+	[string mapname, string params, string sessname, int playtime] = tree->header1 = data->sscanf("%-4H%-4H%-4H%-4c");
 	ret->session = sessname[..<1];
 	//[int timestamp, int visibility, int objver, string modmeta, int modflags, string sessid, string persistent, int cheats]
 	//visibility is "private", "friends only", etc. Not sure what the byte values are.
@@ -780,7 +782,9 @@ string reconstitute_savefile_body(mapping tree) {
 	//Step 1: Build the savefile body
 	string body = reconstitute_savefile_body(tree->savefilebody);
 	Stdio.Buffer data = Stdio.Buffer();
-	data->sprintf("%-4c%-4c%-4c%-4H%-4H%-4H%-4c", @tree->header);
+	data->sprintf("%-4c%-4c%-4c", @tree->header);
+	if (tree->header[0] >= 14) data->sprintf("%-4H", tree->savename);
+	data->sprintf("%-4H%-4H%-4H%-4c", @tree->header1);
 	data->sprintf("%-8c%c%-4c%-4H%-4c%-4H%24s%-4c", @tree->header2);
 	//The body gets its own size prepended to it, then gets deflated in 128k chunks.
 	foreach (body / 131072.0, string chunk) {
