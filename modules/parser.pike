@@ -143,6 +143,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 				case "RailroadTrackPosition":
 				case "DateTime":
 				case "ClientIdentityInfo":
+				case "Guid":
 					//For now these can land in the residue
 					//werror("TODO: StructProperty %O\n", p->subtype);
 					break;
