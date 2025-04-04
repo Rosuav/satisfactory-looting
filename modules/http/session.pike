@@ -9,7 +9,8 @@ mapping(string:mixed)|string|Concurrent.Future http_request(Protocols.HTTP.Serve
 		"vars": ([
 			"ws_group": Protocols.HTTP.Server.http_decode_string(session),
 			"ws_code": "file",
-			"item_names": ITEM_NAMES,
+			//FIXME as per file.pike
+			"item_names": (["Desc_AluminumPlateReinforced_C": "Heat Sink"]),
 		]),
 	]));
 }

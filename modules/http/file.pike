@@ -8,7 +8,9 @@ mapping(string:mixed)|string|Concurrent.Future http_request(Protocols.HTTP.Serve
 		"title": "Satisfactory Looting",
 		"vars": ([
 			"ws_group": Protocols.HTTP.Server.http_decode_string(filename),
-			"item_names": ITEM_NAMES,
+			//FIXME: Get this from the current savefile, and sort affabeck on the front end too
+			//Still need to provide the l10n for each one. Ditto session.pike.
+			"item_names": (["Desc_AluminumPlateReinforced_C": "Heat Sink"]),
 		]),
 	]));
 }

@@ -8,7 +8,6 @@ mapping(string:mixed)|string|Concurrent.Future http_request(Protocols.HTTP.Serve
 		"title": "EU4 Savefile Analysis",
 		"vars": ([
 			"ws_group": Protocols.HTTP.Server.http_decode_string(tag),
-			"item_names": ITEM_NAMES,
 		]),
 	]));
 }
