@@ -269,6 +269,14 @@ mapping low_parse_savefile(string fn) {
 		while (count--) {
 			//objtype, class, level, prop
 			array obj = data->sscanf("%-4c%-4H%-4H%-4H");
+			//I'm not sure what changed in version 14 (v1.1) but there seems to be
+			//another 4-byte integer here - with a fixed value, I think.
+			mapping xtra = ([]);
+			if (ver1 >= 14) xtra->unkv14 = data->sscanf("%-4c")[0];
+			if (sizeof(obj) < 4) {
+				write("\e[1;31m[%X] Bad parse - insufficient values\e[0m %O\n", sizeof(decomp) - sizeof(data), obj);
+				if (sizeof(objects)) write("\e[1;33mPrevious entity:\e[0m %O\n", objects[-1]);
+			}
 			if (obj[0]) {
 				//Actor
 				obj += data->sscanf("%-4c%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4c"); //Transform (rotation/translation/scale)
@@ -276,6 +284,7 @@ mapping low_parse_savefile(string fn) {
 				//Object/component
 				obj += data->sscanf("%-4H");
 			}
+			obj += ({xtra});
 			objects += ({obj});
 		}
 		sublevel->objects = objects;
@@ -288,7 +297,7 @@ mapping low_parse_savefile(string fn) {
 		endpoint = sizeof(data) + 4 - entsz;
 		//Note that nument ought to be the same as the object count (and therefore sizeof(objects)) from above
 		for (int i = 0; i < sizeof(objects) && i < nument; ++i) {
-			mapping obj = ([]); objects[i] += ({obj});
+			mapping obj = objects[i][-1];
 			[obj->ver, obj->flg, int sz] = data->sscanf("%-4c%-4c%-4c");
 			int propend = sizeof(data) - sz;
 			int interesting = 0; //has_value(objects[i][1], "Char_Player");
@@ -743,12 +752,14 @@ string reconstitute_savefile_body(int ver1, mapping tree) {
 		//Object headers
 		level->sprintf("%-4c", sizeof(sublevel->objects));
 		foreach (sublevel->objects, array obj) {
+			level->sprintf("%-4c%-4H%-4H%-4H", @obj[..3]);
+			if (ver1 >= 14) level->sprintf("%-4c", obj[-1]->unkv14);
 			if (obj[0]) {
 				//Actor
-				level->sprintf("%-4c%-4H%-4H%-4H%-4c%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4c", @obj[..<0]); //Transform (rotation/translation/scale)
+				level->sprintf("%-4c%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4F%-4c", @obj[4..<0]); //Transform (rotation/translation/scale)
 			} else {
 				//Object/component
-				level->sprintf("%-4c%-4H%-4H%-4H%-4H", @obj[..<0]);
+				level->sprintf("%-4H", @obj[4..<0]);
 			}
 		}
 		//Collectables
