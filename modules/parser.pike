@@ -325,7 +325,9 @@ mapping low_parse_savefile(string fn) {
 			])[objects[i][1]])
 				ret->pois += ({({label, objects[i][9..11], prop})});
 		}
-		if (sizeof(data) > endpoint) data->post_objects_bytes = data->read(sizeof(data) - endpoint);
+		if (sizeof(data) > endpoint) sublevel->post_objects_bytes = data->read(sizeof(data) - endpoint);
+		//HYPOTHESIS: Save version 14 inserts another integer here
+		if (ver1 >= 14) [sublevel->unkv14] = data->sscanf("%-4c");
 		[int collected] = data->sscanf("%-4c");
 		sublevel->collecteds = ({ });
 		while (collected--) sublevel->collecteds += ({data->sscanf("%-4H%-4H")});
@@ -728,7 +730,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 
 //Reconstruct the main body of a savefile (which gets compressed in chunks for actual serialization)
 //The tree will be cached_parse_savefile(...)->tree->savefilebody but may have been mutated.
-string reconstitute_savefile_body(mapping tree) {
+string reconstitute_savefile_body(int ver1, mapping tree) {
 	Stdio.Buffer data = Stdio.Buffer();
 	data->sprintf("%-4c%-4H%-4c%-4c%-4c%-4H%-4c", 6, "None\0", 0, tree->hdr1, 1, "None\0", tree->hdr2);
 	foreach (tree->levelgroupinggrids, [string title, int unk17, int unk18, array info]) {
@@ -768,6 +770,7 @@ string reconstitute_savefile_body(mapping tree) {
 		}
 		if (sublevel->post_objects_bytes) level->add(sublevel->post_objects_bytes);
 		data->sprintf("%-8H", (string)level);
+		if (ver1 >= 14) data->sprintf("%-4c", sublevel->unkv14);
 		//Note that collectables are *included* in the headers size, but collecteds are *excluded* from the objects size.
 		//We're still better than Adobe formats though.
 		data->sprintf("%-4c%{%-4H%-4H%}", sizeof(sublevel->collecteds), sublevel->collecteds);
@@ -780,7 +783,7 @@ string reconstitute_savefile_body(mapping tree) {
 //but may have been mutated in between.
 @export: string reconstitute_savefile(mapping tree) {
 	//Step 1: Build the savefile body
-	string body = reconstitute_savefile_body(tree->savefilebody);
+	string body = reconstitute_savefile_body(tree->header[0], tree->savefilebody);
 	Stdio.Buffer data = Stdio.Buffer();
 	data->sprintf("%-4c%-4c%-4c", @tree->header);
 	if (tree->header[0] >= 14) data->sprintf("%-4H", tree->savename);
