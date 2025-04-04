@@ -26,6 +26,7 @@ void walk(mixed tree, string path, function handler) {
 
 @"Edited as needed, does what's needed":
 void test() {
+	trace_on_signal();
 	object parser = G->bootstrap("modules/parser.pike");
 	program ObjectRef = parser->ObjectRef;
 	if (1) {

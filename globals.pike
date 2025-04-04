@@ -310,3 +310,10 @@ int threeplace(string value) {
 	sscanf(value, "%[-]%[0-9].%[0-9]", string neg, string whole, string frac);
 	return (neg == "-" ? -1 : 1) * ((int)whole * 1000 + (int)sprintf("%.03s", frac + "000"));
 }
+
+void trace_on_signal() {
+	//Call to enable Ctrl-\ for a traceback
+	signal(3) { //SIGQUIT
+		werror("TRACEBACK/^\n%s\n", describe_backtrace(backtrace())); //heh heh... there'll probably be a "\^" at the start of the line...
+	};
+}
