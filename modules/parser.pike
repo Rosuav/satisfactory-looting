@@ -292,7 +292,12 @@ mapping low_parse_savefile(string fn) {
 			objects += ({obj});
 		}
 		sublevel->objects = objects;
-		[int coll] = data->sscanf("%-4c");
+		int coll;
+		if (sizeof(data) - endpoint >= 4) {
+			//The collectables section sometimes seems to be omitted. Make sure there's room
+			//for at least the count.
+			coll = data->read_le_int(4);
+		}
 		sublevel->collectables = ({ });
 		while (coll--) sublevel->collectables += ({data->sscanf("%-4H%-4H")});
 		//Not sure what extra bytes there might be. Also, what if we're already past this point?
