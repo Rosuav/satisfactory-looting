@@ -442,7 +442,7 @@ void add_map_marker(mapping savefile, string label, float x, float y, float z) {
 				"compassViewDistance": (["type": "EnumProperty", "subtype": "ECompassViewDistance", "value": "ECompassViewDistance::CVD_Off"]),
 			]);
 			int add = 1;
-			foreach (marks->value; int i; mapping mark) if (mark->MarkerID->value == 255) {
+			foreach (marks->value; int i; mapping mark) if (mark->MarkerID->?value == 255) {
 				//Reuse an existing marker slot. I think this is safe?
 				newmark->MarkerID->value = i;
 				marks->value[i] = newmark;

@@ -36,13 +36,30 @@ void test() {
 	write("------ Mental ------\n");
 	mapping savefile = parser->low_parse_savefile("Mental_autosave_0.sav");
 	write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
+	array avail = ({ }), unclaimed = ({ });
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
 		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
-			werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);
+			//werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);
 			//We can see that player X has highlighted marker Y, but X and Y are given as
 			//object references. The map markers themselves (obj[-1]->prop->mMapMarkers)
 			//do not seem to have their reference IDs. Have we already thrown those away
 			//at an earlier phase of parsing?
 		}
+		if (obj[1] == "/Script/FactoryGame.FGRecipeManager\0")
+			avail = obj[-1]->prop->mAvailableRecipes->value;
+		if (obj[1] == "/Game/FactoryGame/Recipes/Research/BP_ResearchManager.BP_ResearchManager_C\0")
+			unclaimed = obj[-1]->prop->mUnclaimedHardDriveData->value;
 	}
+	foreach (unclaimed, mapping hd) {
+		if (!hd->PendingRewardsRerollsExecuted->value) werror("HD: Can reroll\n");
+		else werror("HD: No reroll\n");
+		foreach (hd->PendingRewards->value, object rew)
+			werror("\t%s\n", L10n((rew->path / ".")[1]));
+	}
+	//array want = ({...});
+	//TODO: Make a way to check what's still needed for a particular set of recipes
+	//Possibly offer options, too?
+	//Example: Heavy Oil Residue, Diluted Fuel | Diluted Packaged Fuel, Recycled Plastic, Recycled Rubber
+	// == Ouroboros. For each one, is it already available? Is it currently in an unclaimed HD? And maybe
+	//see if its prereqs are fulfilled - not sure if I can see that.
 }
