@@ -29,7 +29,7 @@ void test() {
 	trace_on_signal();
 	object parser = G->bootstrap("modules/parser.pike");
 	program ObjectRef = parser->ObjectRef;
-	if (1) {
+	if (0) {
 		write("------ Stable ------\n");
 		parser->low_parse_savefile("Assembly First_autosave_1.sav");
 	}
