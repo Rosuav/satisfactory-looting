@@ -59,8 +59,8 @@ void test() {
 		"Schematic_Alternate_RecycledRubber_C",
 	});
 	foreach (unclaimed, mapping hd) {
-		if (!hd->PendingRewardsRerollsExecuted->value) werror("HD: Can reroll\n");
-		else werror("HD: No reroll\n");
+		if (!hd->PendingRewardsRerollsExecuted->value) werror("HD: Reroll available\n");
+		else werror("HD: (no reroll)\n");
 		foreach (hd->PendingRewards->value, object rew)
 			werror("\t%s\n", L10n((rew->path / ".")[1]));
 	}
