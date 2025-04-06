@@ -401,7 +401,7 @@ mapping low_parse_savefile(string fn) {
 		//NOTE: A marker with MarkerID\0 of 255 seems possibly to have been deleted??
 		//It's like the slot is left in the array but the marker is simply not shown.
 		//We suppress those from our array, as they are uninteresting.
-		if (mark->MarkerID->value == 255) continue;
+		if (mark->MarkerID->?value == 255) continue;
 		//Would be nice to show if the marker is highlighted. This info may actually be
 		//stored the other way around - a flag on the player saying "highlight this marker".
 		mapping m = (["Location": ({
@@ -410,7 +410,7 @@ mapping low_parse_savefile(string fn) {
 			mark->Location->value->Z->value,
 		})]);
 		foreach ("MarkerID CategoryName Color IconID Name compassViewDistance" / " ", string key)
-			m[key] = mark[key]->value;
+			m[key] = mark[key]->?value;
 		markers += ({m});
 	}
 	ret->mapmarkers = markers;
