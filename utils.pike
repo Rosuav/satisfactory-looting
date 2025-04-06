@@ -35,6 +35,7 @@ void test() {
 	}
 	write("------ Mental ------\n");
 	mapping savefile = parser->low_parse_savefile("Mental_autosave_0.sav");
+	write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
 		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
 			werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);
