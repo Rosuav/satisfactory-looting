@@ -50,13 +50,20 @@ void test() {
 		if (obj[1] == "/Game/FactoryGame/Recipes/Research/BP_ResearchManager.BP_ResearchManager_C\0")
 			unclaimed = obj[-1]->prop->mUnclaimedHardDriveData->value;
 	}
+	//TODO: Record the recipes, and for each schematic in the hard drives, look up which recipes it
+	//unlocks. The info is in the same JSON file that has the l10n.
+	array want = ({
+		"Schematic_Alternate_HeavyOilResidue_C",
+		"Schematic_Alternate_DilutedPackagedFuel_C", //TODO: Or Diluted Fuel
+		"Schematic_Alternate_Plastic1_C", //Recycled Plastic
+		"Schematic_Alternate_RecycledRubber_C",
+	});
 	foreach (unclaimed, mapping hd) {
 		if (!hd->PendingRewardsRerollsExecuted->value) werror("HD: Can reroll\n");
 		else werror("HD: No reroll\n");
 		foreach (hd->PendingRewards->value, object rew)
 			werror("\t%s\n", L10n((rew->path / ".")[1]));
 	}
-	//array want = ({...});
 	//TODO: Make a way to check what's still needed for a particular set of recipes
 	//Possibly offer options, too?
 	//Example: Heavy Oil Residue, Diluted Fuel | Diluted Packaged Fuel, Recycled Plastic, Recycled Rubber
