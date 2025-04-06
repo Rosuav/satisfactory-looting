@@ -712,6 +712,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 						case "RailroadTrackPosition":
 						case "DateTime":
 						case "ClientIdentityInfo":
+						case "Guid":
 							//TODO as above, for now they come from residue
 							break;
 						default:
