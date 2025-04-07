@@ -31,11 +31,13 @@ void test() {
 	program ObjectRef = parser->ObjectRef;
 	if (0) {
 		write("------ Stable ------\n");
-		parser->low_parse_savefile("Assembly First_autosave_1.sav");
+		mapping savefile = parser->low_parse_savefile("Assembly First_autosave_1.sav");
+		write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
 	}
 	write("------ Mental ------\n");
 	mapping savefile = parser->low_parse_savefile("Mental_autosave_0.sav");
 	write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
+	return;
 	array avail = ({ }), unclaimed = ({ });
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
 		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
