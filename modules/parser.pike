@@ -203,11 +203,14 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 
 //Parse a savefile, bypassing the cache. Can be used when mutation is intended.
 mapping low_parse_savefile(string fn) {
-	mapping ret = ([]);
-
-	//------------- Parse the save file -------------//
 	Stdio.Buffer data = Stdio.Buffer(Stdio.read_file(SATIS_SAVE_PATH + "/" + fn));
 	data->read_only();
+	return parse_savefile_data(data);
+}
+
+//Even lower level helper for when you want to test an in-memory buffer
+mapping parse_savefile_data(Stdio.Buffer data) {
+	mapping ret = ([]);
 	//Huh. Unlike the vast majority of games out there, Satisfactory has info on its official wiki.
 	//https://satisfactory.wiki.gg/wiki/Save_files
 	//mapname is always "Persistent_Level"; sessname is what the user entered to describe the session.
