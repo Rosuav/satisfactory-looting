@@ -202,7 +202,14 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 }
 
 //Parse a savefile, bypassing the cache. Can be used when mutation is intended.
-mapping low_parse_savefile(string fn) {
+mapping low_parse_savefile(string|zero fn) {
+	if (!fn) {
+		//Pick the latest file and parse that.
+		array files = get_dir(SATIS_SAVE_PATH), paths = SATIS_SAVE_PATH + "/" + files[*];
+		array times = file_stat(paths[*])->mtime;
+		sort(times, files);
+		fn = files[-1];
+	}
 	Stdio.Buffer data = Stdio.Buffer(Stdio.read_file(SATIS_SAVE_PATH + "/" + fn));
 	data->read_only();
 	return parse_savefile_data(data);

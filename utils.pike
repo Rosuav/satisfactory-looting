@@ -27,7 +27,7 @@ void walk(mixed tree, string path, function handler) {
 @"Dump out current hard drive library":
 void hd() {
 	object parser = G->bootstrap("modules/parser.pike");
-	mapping savefile = parser->low_parse_savefile("Mental_autosave_0.sav");
+	mapping savefile = parser->low_parse_savefile(0);
 	array avail = ({ }), unclaimed = ({ });
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
 		if (obj[1] == "/Script/FactoryGame.FGRecipeManager\0")
