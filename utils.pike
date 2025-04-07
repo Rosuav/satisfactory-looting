@@ -67,14 +67,8 @@ void test() {
 		write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
 	}
 	write("------ Mental ------\n");
-	mapping savefile = parser->low_parse_savefile("Mental_autosave_0.sav");
+	mapping savefile = parser->low_parse_savefile("Mental_autosave_2.sav");
 	//write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
-	write("Markers: %O\n", savefile->mapmarkers);
-	//Add some markers, build a savefile, then reparse.
-	parser->add_map_marker(savefile, "Origin", 0.0, 0.0, 0.0);
-	string rebuilt = parser->reconstitute_savefile(savefile->tree);
-	mapping reparsed = parser->parse_savefile_data(Stdio.Buffer(rebuilt));
-	write("Now markers: %O\n", reparsed->mapmarkers);
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
 		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
 			//werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);

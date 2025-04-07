@@ -23,6 +23,9 @@ On a session group, the effective savefile is always the most recently modified 
 matching that base name (eg Noob*.sav). If a new file is created/updated within the group,
 it will automatically be pushed out.
 
+TODO: Currently, creation of map markers fails if there are no other markers in the
+savefile. How can we synthesize the first ever map marker? Can we do that safely?
+
 
 Europa Universalis IV savefile parser
 -------------------------------------
