@@ -24,29 +24,12 @@ void walk(mixed tree, string path, function handler) {
 			walk(val, sprintf("%s[%O]", path, key), handler);
 }
 
-@"Edited as needed, does what's needed":
-void test() {
-	trace_on_signal();
+@"Dump out current hard drive library":
+void hd() {
 	object parser = G->bootstrap("modules/parser.pike");
-	program ObjectRef = parser->ObjectRef;
-	if (0) {
-		write("------ Stable ------\n");
-		mapping savefile = parser->low_parse_savefile("Assembly First_autosave_1.sav");
-		write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
-	}
-	write("------ Mental ------\n");
 	mapping savefile = parser->low_parse_savefile("Mental_autosave_0.sav");
-	write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
-	return;
 	array avail = ({ }), unclaimed = ({ });
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
-		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
-			//werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);
-			//We can see that player X has highlighted marker Y, but X and Y are given as
-			//object references. The map markers themselves (obj[-1]->prop->mMapMarkers)
-			//do not seem to have their reference IDs. Have we already thrown those away
-			//at an earlier phase of parsing?
-		}
 		if (obj[1] == "/Script/FactoryGame.FGRecipeManager\0")
 			avail = obj[-1]->prop->mAvailableRecipes->value;
 		if (obj[1] == "/Game/FactoryGame/Recipes/Research/BP_ResearchManager.BP_ResearchManager_C\0")
@@ -71,4 +54,29 @@ void test() {
 	//Example: Heavy Oil Residue, Diluted Fuel | Diluted Packaged Fuel, Recycled Plastic, Recycled Rubber
 	// == Ouroboros. For each one, is it already available? Is it currently in an unclaimed HD? And maybe
 	//see if its prereqs are fulfilled - not sure if I can see that.
+}
+
+@"Edited as needed, does what's needed":
+void test() {
+	trace_on_signal();
+	object parser = G->bootstrap("modules/parser.pike");
+	program ObjectRef = parser->ObjectRef;
+	if (0) {
+		write("------ Stable ------\n");
+		mapping savefile = parser->low_parse_savefile("Assembly First_autosave_1.sav");
+		write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
+	}
+	write("------ Mental ------\n");
+	mapping savefile = parser->low_parse_savefile("Mental_autosave_0.sav");
+	//write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
+	write("Markers: %O\n", savefile->mapmarkers);
+	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
+		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
+			//werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);
+			//We can see that player X has highlighted marker Y, but X and Y are given as
+			//object references. The map markers themselves (obj[-1]->prop->mMapMarkers)
+			//do not seem to have their reference IDs. Have we already thrown those away
+			//at an earlier phase of parsing?
+		}
+	}
 }
