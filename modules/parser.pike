@@ -97,6 +97,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 					case "IntProperty": arr += data->sscanf("%-4c"); break;
 					case "Int64Property": arr += data->sscanf("%-8c"); break;
 					case "FloatProperty": arr += data->sscanf("%-4F"); break;
+					case "EnumProperty": //Enums are stored as strings
 					case "StrProperty": arr += data->sscanf("%-4H"); break;
 					default:
 						//write("UNKNOWN ARRAY SUBTYPE %O [%d elem, %d bytes] %O\n", p->subtype, elements + 1, sizeof(data) - end, ((string)data)[..sizeof(data) - end - 1]);
@@ -667,6 +668,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 						case "IntProperty": dest->sprintf("%-4c", elem); break;
 						case "Int64Property": dest->sprintf("%-8c", elem); break;
 						case "FloatProperty": dest->sprintf("%-4F", elem); break;
+						case "EnumProperty": //Enums are stored as strings
 						case "StrProperty": dest->sprintf("%-4H", elem); break;
 						default: break;
 					}
