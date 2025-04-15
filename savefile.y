@@ -57,7 +57,7 @@ value: '{' '}' {$$ = (union YYSTYPE *)make_map(NULL, NULL, NULL);};
 
 extern const char *next;
 extern size_t remaining;
-int hack_nexttoken = 0;
+int hack_nexttoken = 0, hack_history_empty = 0;
 static inline char readchar() {
 	if (!remaining) return 0;
 	--remaining;
@@ -118,8 +118,22 @@ int yylex(void) {
 					//Hack: this one element seems to omit the equals sign for some reason.
 					if (next - start == 13 && !strncmp(start, "map_area_data", 13))
 						hack_nexttoken = '=';
+					//Hack: The history block sometimes has an empty block before the actual name=value part.
+					//Solving this in the grammar would result in ambiguity with array syntax, so instead,
+					//we solve it here. If the exact token sequence "history" "=" "{" "{" "}" is seen, the
+					//last pair get skipped. Otherwise, we tokenize as normal.
+					//If it's stupid, but it works... it's not stupid... right?
+					if (next - start == 7 && !strncmp(start, "history", 7))
+						hack_history_empty = 1;
+					else hack_history_empty = 0;
 					return STRING;
 				}
+				if (hack_history_empty && "h={{}"[hack_history_empty] == c) {
+					++hack_history_empty;
+					if (hack_history_empty == 5) hack_history_empty = 0;
+					if (hack_history_empty == 4 || hack_history_empty == 0) return yylex();
+				}
+				else hack_history_empty = 0;
 				return c; //Unknown character, probably punctuation.
 			}
 		}

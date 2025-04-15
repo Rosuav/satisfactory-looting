@@ -83,6 +83,7 @@ mapping parse_eu4txt(string|Stdio.Buffer data, function|void progress_cb, int|vo
 	data->read_only();
 	if (progress_cb) progress_cb(-sizeof(data)); //Signal the start with a negative size
 	string ungetch;
+	int hack_history_empty = 0;
 	string|array next() {
 		if (progress_cb) progress_cb(sizeof(data));
 		if (string ret = ungetch) {ungetch = 0; return ret;}
@@ -113,9 +114,18 @@ mapping parse_eu4txt(string|Stdio.Buffer data, function|void progress_cb, int|vo
 			if ((<"yes", "no">)[word]) return ({"boolean", word == "yes"});
 			//Hack: this one element seems to omit the equals sign for some reason.
 			if (word == "map_area_data") ungetch = "=";
+			//Hack: The history block sometimes has an empty block. See savefile.y for further explanation.
+			if (word == "history") hack_history_empty = 1;
 			return ({"string", word});
 		}
-		return data->read(1);
+		string ch = data->read(1);
+		if (hack_history_empty && "h={{}"[hack_history_empty] == ch[0]) {
+			++hack_history_empty;
+			if (hack_history_empty == 5) hack_history_empty = 0;
+			if (hack_history_empty == 4 || hack_history_empty == 0) return next();
+		}
+		else hack_history_empty = 0;
+		return ch;
 	}
 	string|array shownext() {mixed tok = next(); write("%O\n", tok); return tok;}
 	//while (shownext() != ""); return 0; //Dump tokens w/o parsing
