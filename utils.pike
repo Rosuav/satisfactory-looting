@@ -66,9 +66,23 @@ void test() {
 		mapping savefile = parser->low_parse_savefile("Assembly First_autosave_1.sav");
 		write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
 	}
-	write("------ Mental ------\n");
-	mapping savefile = parser->low_parse_savefile("Mental_autosave_2.sav");
-	//write("Reconstituted %d bytes.\n", sizeof(parser->reconstitute_savefile(savefile->tree)));
+	if (0) foreach (sort(get_dir(SATIS_SAVE_PATH)), string fn) {
+		mapping savefile = parser->low_parse_savefile(fn);
+		if (!savefile->tree->savefilebody) write("%s parse failed\n", fn);
+		else write("%s unkv14 %O\n", fn, savefile->tree->savefilebody->sublevels[-1]->unkv14);
+	}
+	write("------ Naval ------\n");
+	mapping savefile = parser->low_parse_savefile("Naval Warfare_autosave_0.sav");
+	if (1) {
+		string reconst = parser->reconstitute_savefile(savefile->tree);
+		write("Reconstituted %d bytes.\n", sizeof(reconst));
+		Stdio.Buffer data = Stdio.Buffer(reconst);
+		data->read_only();
+		mapping reparsed = parser->parse_savefile_data(data);
+		write("Original: %O\nReparsed: %O\n",
+			savefile->tree->savefilebody->sublevels[-1]->unkv14,
+			reparsed->tree->savefilebody->sublevels[-1]->unkv14);
+	}
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
 		if (obj[1] == "/Script/FactoryGame.FGMapManager\0") {
 			//werror("Highlights: %O\n", obj[-1]->prop->mHighlightedMarkers);

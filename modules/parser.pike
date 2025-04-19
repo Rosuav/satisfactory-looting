@@ -224,6 +224,7 @@ mapping parse_savefile_data(Stdio.Buffer data) {
 	mapping tree = ret->tree = ([]); //Everything needed to reconstruct the original savefile.
 	[int ver1, int ver2, int build] = tree->header = data->sscanf("%-4c%-4c%-4c");
 	if (ver1 < 13) return ret; //There seem to be some differences with really really old savefiles
+	if (ver1 > 1<<30) return ret; //Probably not a valid savefile.
 	if (ver1 >= 14) [tree->savename] = data->sscanf("%-4H");
 	[string mapname, string params, string sessname, int playtime] = tree->header1 = data->sscanf("%-4H%-4H%-4H%-4c");
 	ret->session = sessname[..<1];
@@ -356,8 +357,13 @@ mapping parse_savefile_data(Stdio.Buffer data) {
 				ret->pois += ({({label, objects[i][9..11], prop})});
 		}
 		if (sizeof(data) > endpoint) sublevel->post_objects_bytes = data->read(sizeof(data) - endpoint);
-		//HYPOTHESIS: Save version 14 inserts another integer here
-		if (ver1 >= 14) [sublevel->unkv14] = data->sscanf("%-4c");
+		//HYPOTHESIS: Save version 14 inserts another integer here. In the sublevels,
+		//it has unknown meaning, but in the persistent level, it's the number of...
+		//somethings. Of unknown meaning. But they're strings.
+		if (ver1 >= 14) {
+			[sublevel->unkv14] = data->sscanf("%-4c");
+			if (!sublevel->lvlname) sublevel->unkv14 = data->sscanf("%-4H" * sublevel->unkv14);
+		}
 		[int collected] = data->sscanf("%-4c");
 		sublevel->collecteds = ({ });
 		while (collected--) sublevel->collecteds += ({data->sscanf("%-4H%-4H")});
@@ -805,7 +811,12 @@ string reconstitute_savefile_body(int ver1, mapping tree) {
 		}
 		if (sublevel->post_objects_bytes) level->add(sublevel->post_objects_bytes);
 		data->sprintf("%-8H", (string)level);
-		if (ver1 >= 14) data->sprintf("%-4c", sublevel->unkv14);
+		if (ver1 >= 14) {
+			//See above in the parsing; in the sublevels, this is just an integer, but
+			//in the persistent level, there's an array of strings.
+			if (arrayp(sublevel->unkv14)) data->sprintf("%-4c%{%-4H%}", sizeof(sublevel->unkv14), sublevel->unkv14);
+			else data->sprintf("%-4c", sublevel->unkv14);
+		}
 		//Note that collectables are *included* in the headers size, but collecteds are *excluded* from the objects size.
 		//We're still better than Adobe formats though.
 		data->sprintf("%-4c%{%-4H%-4H%}", sizeof(sublevel->collecteds), sublevel->collecteds);
