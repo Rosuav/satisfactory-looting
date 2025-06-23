@@ -198,7 +198,12 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 	//NOTE: If this function is made asynchronous or there is any other way that this could run
 	//reentrantly, place a stub in the cache, and validate the stub before returning, blocking
 	//until the first parser has finished.
-	return parse_cache[fn] = (["mtime": mtime]) | low_parse_savefile(fn);
+	mapping savefile;
+	if (mixed ex = catch {savefile = low_parse_savefile(fn);}) {
+		werror("Parsing failed for %O\n%s\n", fn, describe_backtrace(ex));
+		return (["mtime": 0]); //Do we need a separate error return?
+	}
+	return parse_cache[fn] = (["mtime": mtime]) | savefile;
 }
 
 //Parse a savefile, bypassing the cache. Can be used when mutation is intended.

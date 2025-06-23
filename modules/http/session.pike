@@ -33,11 +33,15 @@ mapping websocket_cmd_findloot(mapping(string:mixed) conn, mapping(string:mixed)
 	if (sizeof(loc) != 3) return 0;
 	foreach (loc, mixed coord) if (!intp(coord) && !floatp(coord)) return 0;
 	if (!stringp(msg->itemtype)) return 0;
-	mapping savefile = annotate_map(get_session_latest(conn->group), ({
+	mapping savefile;
+	if (mixed ex = catch (savefile = annotate_map(get_session_latest(conn->group), ({
 		({"find_loot", loc, msg->itemtype}),
 		({"autocrop"}),
 		msg->save && ({"save"}),
-	}));
+	})))) {
+		werror("Unable to annotate map:\n%s\n", describe_backtrace(ex));
+		return (["cmd": "findloot", "error": "Annotation failed"]);
+	}
 
 	return ([
 		"cmd": "findloot",

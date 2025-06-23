@@ -241,7 +241,9 @@ protected void create(string name) {
 		[int event, int cookie, string path] = __ARGS__;
 		//Note that the same hook is called on deletion as on creation. If you care about the difference,
 		//stat the file on arrival.
-		values(G->G->inotify_hooks)("satis", basename(path));
+		foreach (values(G->G->inotify_hooks), function hook)
+			if (mixed ex = catch (hook("satis", basename(path))))
+				werror("Unhandled exception in satis hook %O\n%s\n", path, describe_backtrace(ex));
 	};
 	watch_game_log(inot);
 	inot->set_nonblocking();
