@@ -2395,43 +2395,6 @@ void analyze_wars(mapping data, multiset(string) tags, mapping write) {
 	}
 }
 
-/* TODO:
-1. Enumerate all areas in which you have provinces. Show whether state or not.
-2. For each state, show and sum the governing cost. Should match the in-game display.
-3. For each territory, show the number of provinces with full cores vs territorial cores vs trade company vs colony
-4. Predict the REAL governing cost of stating that area.
-
-Note that a lot of this info IS available in-game, but only as raw numbers. For example, attempting to state a territory
-will tell you the increase in cost that would occur, but you then have to check that against others. Also, the current
-usage does not update for colonial core to full core transitions until EOM.
-*/
-void _tinker_analyze_states(mapping data, string name, string tag, mapping write, mapping prefs) {
-	mapping country = data->countries[tag];
-	//string base_province = "1166"; //Loango in Kongolese Coast (territory)
-	string base_province = "4549"; //Xativa in Valencia (state)
-	//string base_province = "183"; //Paris in Ile-de-France (state)
-	foreach (G->CFG->map_areas[G->CFG->prov_area[base_province]], string id) m_delete(data->provinces["-" + id], "all_province_modifiers"); //Decache
-	mapping area = all_area_modifiers(data, G->CFG->prov_area[base_province]);
-	mapping nation = all_country_modifiers(data, country);
-	int is_state = has_value(Array.arrayify(data->map_area_data[G->CFG->prov_area[base_province]]->?state->?country_state)->country, tag);
-	werror("Area [%s]: %O\n", is_state ? "state" : "territory", area);
-	foreach (G->CFG->map_areas[G->CFG->prov_area[base_province]], string id) {
-		mapping prov = all_province_modifiers(data, (int)id) - (<"_index", "_sources">);
-		int cost = prov->development * 1000;
-		int mod = 1000 + prov->local_governing_cost + area->statewide_governing_cost + nation->governing_cost;
-		if (is_state) mod += nation->state_governing_cost; //Check these!
-		else mod += nation->territory_governing_cost - 750; //Territories get a 75% discount
-		//TODO: Colonial core - 50% reduction
-		//TODO: territory_governing_cost, trade_company_governing_cost, state_governing_cost
-		if (mod < 10) mod = 10; //Can't get the percentage modifiers stronger than a 99% discount
-		werror("%s: %O\n", data->provinces["-" + id]->name, prov);
-		werror("%s: %d * %d/1000 %+d\n", data->provinces["-" + id]->name, cost, mod, prov->local_governing_cost_increase);
-		cost = (cost * mod) / 1000 + prov->local_governing_cost_increase;
-		if (cost < 0) cost = 0; //But a state house can reduce it all the way to zero.
-		werror("%s: %d\n", data->provinces["-" + id]->name, cost);
-	}
-}
-
 //List territories (non-stated areas) that contain full cores. These usually come from integrating subjects,
 //which gives you full cores (not territorial cores); having those in a territory will still have the high
 //local autonomy that you'd have anywhere else, but it doesn't cost any admin power to state those. So when
@@ -2443,23 +2406,51 @@ void analyze_states(mapping data, string tag, mapping write) {
 	multiset seen = (<>); //Cache. Since we'll be looking at every province with a full core, we're often going to hit the existing states.
 	foreach (country->owned_provinces, string id) {
 		mapping prov = data->provinces["-" + id];
+		if (!has_value(Array.arrayify(prov->cores), tag)) continue; //You don't have core on it
 		if (prov->territorial_core) continue; //Do we need to check if it's == tag? AFAIK only the current owner can have a territorial core.
 		if (!prov->is_city) continue; //Colonies don't count; you can't state an area with just colonies in it.
 		string area = G->CFG->prov_area[id];
 		if (seen[area]) continue;
+		seen[area] = 1;
 		//The lookup is complicated, since multiple tags can have a state in an area.
 		int is_state = has_value(Array.arrayify(data->map_area_data[area]->?state->?country_state)->country, tag);
-		if (is_state) {seen[area] = 1; continue;}
+		if (is_state) continue;
 		//Okay. It's a full (non-territorial) core, and it's in a territory. Report it.
-		terr += ({([
-			"prov": id,
+		mapping t = ([
 			"area": L10N(area),
-		])});
+		]);
+		terr += ({t});
+		//List every province we own in that area, with its current gov cap usage, and what it'd cost as a full core.
+		mapping areamod = all_area_modifiers(data, area);
+		mapping nation = all_country_modifiers(data, country);
+		foreach (G->CFG->map_areas[area], string id) {
+			mapping prov = data->provinces["-" + id];
+			if (prov->owner != tag) continue;
+			mapping provmod = all_province_modifiers(data, (int)id);
+			int cost = provmod->development * 1000;
+			int mod = 1000 + provmod->local_governing_cost + areamod->statewide_governing_cost + nation->governing_cost, mod_state = mod;
+			mod_state += nation->state_governing_cost;
+			mod += nation->territory_governing_cost - 750; //Territories get a 75% discount
+			//TODO: Colonial core - 50% reduction
+			//TODO: Trade company? Probably just exclude this completely.
+			if (mod < 10) mod = 10; //Can't get the percentage modifiers stronger than a 99% discount
+			if (mod_state < 10) mod_state = 10;
+			int cost_state = (cost * mod_state) / 1000 + provmod->local_governing_cost_increase;
+			cost = (cost * mod) / 1000 + provmod->local_governing_cost_increase;
+			if (cost < 0) cost = 0; //But a state house can reduce it all the way to zero.
+			if (cost_state < 0) cost_state = 0;
+			t->prov += ({([
+				"id": id, "name": prov->name,
+				"cost_now": cost, "cost_state": cost_state,
+				"coretype": !prov->is_city ? "Colony" : prov->territorial_core ? "Terr" : "Full",
+			])});
+			t->cost_now += cost; t->cost_state += cost_state;
+		}
 	}
 	write->states = ([
 		"governing_capacity": all_country_modifiers(data, country)->governing_capacity,
 		"used_governing_capacity": threeplace(country->used_governing_capacity),
-		"full_cores_in_territories": terr,
+		"territories_with_full_cores": terr,
 	]);
 }
 

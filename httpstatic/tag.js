@@ -1,6 +1,6 @@
 import {lindt, replace_content, DOM, fix_dialogs} from "https://rosuav.github.io/choc/factory.js";
 const {A, ABBR, B, BR, BUTTON, DETAILS, DIALOG, DIV, FORM, H1, H3, H4, HEADER, IMG, INPUT, LABEL, LI, NAV, OPTGROUP, OPTION, P, SECTION, SELECT, SPAN, STRONG, SUMMARY, TABLE, TD, TH, THEAD, TR, UL} = lindt; //autoimport
-const {BLOCKQUOTE, CODE, I, PRE} = lindt; //Currently autoimport doesn't recognize the section() decorator
+const {BLOCKQUOTE, CAPTION, CODE, I, PRE} = lindt; //Currently autoimport doesn't recognize the section() decorator
 
 let defaultsection = null; //If nonnull, will autoopen this section
 
@@ -669,24 +669,38 @@ section("subjects", "Subjects", "Subject nations", state => [
 //Caution: The word "state" here has two distinct meanings. There's the shared state that the server
 //sends us, and there's the game distinction between a "state" and a "territory" (an area that has
 //low or high autonomy).
-section("states", "States", "States and territories", state => [
-	SUMMARY("States and territories (" + state.states.full_cores_in_territories.length + ")"),
-	P([
-		"Have used ", CODE(threeplace(state.states.used_governing_capacity)),
-		" out of ", CODE(threeplace(state.states.governing_capacity)),
-		" governing capacity: ",
-		GREENRED(state.states.governing_capacity - state.states.used_governing_capacity, " available", " over"),
-		state.states.governing_capacity > state.states.used_governing_capacity && state.states.full_cores_in_territories.length && (max_interesting.states = 2) && "",
-	]),
-	P("Provinces with full cores in areas that aren't states:"),
-	sortable({id: "full_cores", border: "1"},
-		["Province", "Area"], //TODO: Show the gov cap needed to state this area
-		state.states.full_cores_in_territories.map((prov, i) => TR([
-			TD(PROV(prov.prov)),
-			TD(prov.area),
-		])),
-	),
-]);
+section("states", "States", "States and territories", state => {
+	const capac = state.states.governing_capacity - state.states.used_governing_capacity; //Available governing capacity (may be negative)
+	const terr = state.states.territories_with_full_cores.map(area => area.prov.map((prov, i) => TR([
+		!i && TD({
+			rowSpan: area.prov.length,
+			//If stating this area could be done within our available capacity, it should most likely be done.
+			class: area.cost_state - area.cost_now <= capac ? "interesting" + (max_interesting.states = 2) : "",
+		}, [
+			area.area,
+			" (", threeplace(area.cost_state - area.cost_now), ")",
+		]),
+		TD(PROV(prov.id, prov.name)),
+		TD({class: prov.coretype === "Full" ? "interesting2" : ""}, prov.coretype),
+		TD(threeplace(prov.cost_now)),
+		TD(threeplace(prov.cost_state)),
+	])));
+	return [
+		SUMMARY("States and territories (" + state.states.territories_with_full_cores.length + ")"),
+		P([
+			"Have used ", threeplace(state.states.used_governing_capacity),
+			" out of ", threeplace(state.states.governing_capacity),
+			" governing capacity: ", GREENRED(capac, " available", " over"),
+		]),
+		//Not currently a sortable for two reasons: the rowspans (which want to stay on the first displayed row),
+		//and the caption. Caption support might be able to be added though.
+		TABLE({id: "full_cores", border: "1"}, [
+			CAPTION("Territories containing full-core provinces:"),
+			THEAD(TR([TH("Area"), TH("Province"), TH("Core"), TH("Cost"), TH("If stated")])),
+			terr,
+		]),
+	];
+});
 
 section("colonization_targets", "Colonies", "Colonization targets", state => [
 	SUMMARY("Colonization targets (" + state.colonization_targets.length + ")"), //TODO: Count interesting ones too?
