@@ -51,8 +51,6 @@ TODO: War progress.
 - Plot each country's army strength in the table with a graph showing its change from one save to the next
 - Graph the progression of the war as the sum of each side's army strengths
 - Is it possible to show history of battles and how they affected war strength? At very least, show every save sighted.
-TODO: Show full cores not in states, if spare gov capac
-- Popup? Notification? Section?
 
 QUIRK: Sighted an issue with the savefile having an arraymap in it, causing the fast parser
 to fail. It happened in the "history" of a now-defunct colonial nation (not sure if it was a

@@ -1,6 +1,6 @@
 import {lindt, replace_content, DOM, fix_dialogs} from "https://rosuav.github.io/choc/factory.js";
 const {A, ABBR, B, BR, BUTTON, DETAILS, DIALOG, DIV, FORM, H1, H3, H4, HEADER, IMG, INPUT, LABEL, LI, NAV, OPTGROUP, OPTION, P, SECTION, SELECT, SPAN, STRONG, SUMMARY, TABLE, TD, TH, THEAD, TR, UL} = lindt; //autoimport
-const {BLOCKQUOTE, I, PRE} = lindt; //Currently autoimport doesn't recognize the section() decorator
+const {BLOCKQUOTE, CODE, I, PRE} = lindt; //Currently autoimport doesn't recognize the section() decorator
 
 let defaultsection = null; //If nonnull, will autoopen this section
 
@@ -344,6 +344,14 @@ function threeplace(n) {return (n / 1000).toFixed(2);}
 function intify(n) {return ""+Math.floor(n / 1000);}
 function money(n) {return SPAN({style: "color: #770"}, threeplace(n));}
 
+//Return a green or red span depending on whether the value is positive or negative
+//Optional suffix can be added in each case.
+function GREENRED(value, suffix_pos, suffix_neg) {
+	const color = value < 0 ? "red" : "green"; //Zero is green. No "neutral" (yellow) option here.
+	if (value < 0) return [CODE({style: "color: #a00"}, threeplace(-value)), suffix_neg];
+	return [CODE({style: "color: #090"}, threeplace(value)), suffix_pos];
+}
+
 function tradenode_order(a, b) {
 	if (a.passive_income < 0) return -1; //Any "incalculable" entries get pushed to the start to get your attention.
 	if (b.passive_income < 0) return 1;
@@ -657,6 +665,29 @@ section("subjects", "Subjects", "Subject nations", state => [
 		])),
 	),
 ]);
+
+//Caution: The word "state" here has two distinct meanings. There's the shared state that the server
+//sends us, and there's the game distinction between a "state" and a "territory" (an area that has
+//low or high autonomy).
+section("states", "States", "States and territories", state => [
+	SUMMARY("States and territories (" + state.states.full_cores_in_territories.length + ")"),
+	P([
+		"Have used ", CODE(threeplace(state.states.used_governing_capacity)),
+		" out of ", CODE(threeplace(state.states.governing_capacity)),
+		" governing capacity: ",
+		GREENRED(state.states.governing_capacity - state.states.used_governing_capacity, " available", " over"),
+		state.states.governing_capacity > state.states.used_governing_capacity && state.states.full_cores_in_territories.length && (max_interesting.states = 2) && "",
+	]),
+	P("Provinces with full cores in areas that aren't states:"),
+	sortable({id: "full_cores", border: "1"},
+		["Province", "Area"], //TODO: Show the gov cap needed to state this area
+		state.states.full_cores_in_territories.map((prov, i) => TR([
+			TD(PROV(prov.prov)),
+			TD(prov.area),
+		])),
+	),
+]);
+
 section("colonization_targets", "Colonies", "Colonization targets", state => [
 	SUMMARY("Colonization targets (" + state.colonization_targets.length + ")"), //TODO: Count interesting ones too?
 	sortable({id: "colo_targets", border: "1"},

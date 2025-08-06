@@ -410,6 +410,10 @@ mapping(string:int) all_country_modifiers(mapping data, mapping country) {
 			_incorporate(data, country, modifiers, "Ahead of time in " + desc, G->CFG->tech_definitions[cat]->ahead_of_time);
 		//TODO: > or >= ?
 	}
+
+	//Kingdoms and empires gain benefits.
+	_incorporate(data, country, modifiers, "Government Rank", G->CFG->government_ranks[country->government_rank]);
+
 	//HACK: Army morale is actually handled in two parts: base and modifier. They are called land_morale and land_morale.
 	//Yeah. The one that comes from tech is the base, the other is percentage modifiers, but they have the same name.
 	//So in our analysis, we rename the tech ones to base_land_morale. This needs to happen prior to anything that could
@@ -2401,7 +2405,7 @@ Note that a lot of this info IS available in-game, but only as raw numbers. For 
 will tell you the increase in cost that would occur, but you then have to check that against others. Also, the current
 usage does not update for colonial core to full core transitions until EOM.
 */
-void analyze_states(mapping data, string name, string tag, mapping write, mapping prefs) {
+void _tinker_analyze_states(mapping data, string name, string tag, mapping write, mapping prefs) {
 	mapping country = data->countries[tag];
 	//string base_province = "1166"; //Loango in Kongolese Coast (territory)
 	string base_province = "4549"; //Xativa in Valencia (state)
@@ -2428,6 +2432,37 @@ void analyze_states(mapping data, string name, string tag, mapping write, mappin
 	}
 }
 
+//List territories (non-stated areas) that contain full cores. These usually come from integrating subjects,
+//which gives you full cores (not territorial cores); having those in a territory will still have the high
+//local autonomy that you'd have anywhere else, but it doesn't cost any admin power to state those. So when
+//you have enough governing capac, you can cheaply and quickly drop their autonomy.
+//TODO: How can we see the real autonomy value? How do we know how much it would drop once stated?
+void analyze_states(mapping data, string tag, mapping write) {
+	mapping country = data->countries[tag];
+	array terr = ({ });
+	multiset seen = (<>); //Cache. Since we'll be looking at every province with a full core, we're often going to hit the existing states.
+	foreach (country->owned_provinces, string id) {
+		mapping prov = data->provinces["-" + id];
+		if (prov->territorial_core) continue; //Do we need to check if it's == tag? AFAIK only the current owner can have a territorial core.
+		if (!prov->is_city) continue; //Colonies don't count; you can't state an area with just colonies in it.
+		string area = G->CFG->prov_area[id];
+		if (seen[area]) continue;
+		//The lookup is complicated, since multiple tags can have a state in an area.
+		int is_state = has_value(Array.arrayify(data->map_area_data[area]->?state->?country_state)->country, tag);
+		if (is_state) {seen[area] = 1; continue;}
+		//Okay. It's a full (non-territorial) core, and it's in a territory. Report it.
+		terr += ({([
+			"prov": id,
+			"area": L10N(area),
+		])});
+	}
+	write->states = ([
+		"governing_capacity": all_country_modifiers(data, country)->governing_capacity,
+		"used_governing_capacity": threeplace(country->used_governing_capacity),
+		"full_cores_in_territories": terr,
+	]);
+}
+
 //Top-level entrypoint. Analyze the given savefile data with respect to the given country tag.
 @export: mapping analyze_eu4_savefile(mapping data, string name, string tag, mapping|void prefs) {
 	mapping ret = (["tag": tag, "highlight": ([]), "recent_peace_treaties": G->G->recent_peace_treaties || ({ })]);
@@ -2440,5 +2475,6 @@ void analyze_states(mapping data, string name, string tag, mapping write, mappin
 	if (!players[tag]) players = (<tag>); //But if you switch to a non-player country, show that country's wars instead.
 	analyze_wars(data, players, ret);
 	analyze_flagships(data, ret);
+	analyze_states(data, tag, ret);
 	return ret;
 }
