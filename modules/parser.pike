@@ -19,6 +19,23 @@ class ObjectRef(string level, string path, int|void soft) {
 	string encode_json() {return sprintf("\"%s :: %s\"", level, path);}
 }
 
+//TODO: Find places where %-4H is used and consider switching to this. If anything crashes due to
+//a string being waaay longer than the remaining buffer, it's probably UTF-16.
+string read_string(Stdio.Buffer data) {
+	//Satisfactory strings are stored length-preceded in either UTF-8 or UTF-16. It will have
+	//a null terminator, included in the length, which we strip off.
+	//Note: The Buffer provides read_le_int, but not read_le_sint. So the length overflows
+	//if it's too large, not sure why.
+	[int len] = data->sscanf("%-4c");
+	if (len > 1<<31) {
+		//Negative length - it's UTF-16. The length is in code units, so double that for bytes.
+		len = (1<<32) - len;
+		return unicode_to_string(data->read(len * 2))[..<1];
+	}
+	//Otherwise it's UTF-8, and the length is in bytes (which are now the same as code units).
+	return utf8_to_string(data->read(len))[..<1];
+}
+
 //Properties. If chain, expect more meaningful data after the None - otherwise, everything up to the end marker will be discarded.
 mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string path) {
 	mapping ret = ([]);
@@ -168,8 +185,8 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 			sz -= 8;
 		} else if (type == "StrProperty\0") {
 			end = sizeof(data) - sz - 1;
-			[int zero, p->value] = data->sscanf("%c%-4H");
-			p->value -= "\0";
+			data->consume(1); //Ignore the padding byte
+			p->value = read_string(data);
 		} else if (type == "ObjectProperty\0") {
 			end = sizeof(data) - sz - 1;
 			p->value = ObjectRef(@data->sscanf("%*c%-4H%-4H"));
