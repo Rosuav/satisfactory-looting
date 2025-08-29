@@ -90,3 +90,9 @@ Falsifiable hypotheses to test
 * Hypothesis: Chunks are rigid and there aren't too many of them.
 
 Enumerate all fields and the MapProperty. Count stuff.
+
+Some object classes seem only to be in the save file if we've been near them. Includes:
+NutBush/BerryBush/Shroom, CrashSiteDebris, MercerShrine, Crystal, CreatureSpawner
+
+Is BP_Ship_C just another piece of debris? See if it's removable - or more specifically, see if
+clearing a crash site gets rid of one of them.

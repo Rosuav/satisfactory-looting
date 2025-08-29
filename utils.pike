@@ -71,15 +71,51 @@ string describe(array player, array stuff, int|void idx) {
 @"Count the things that might and might not be in the savefile":
 void counter() {
 	object parser = G->bootstrap("modules/parser.pike");
-	write("%-10s %-14s %-14s %-14s\n", "Save", "Spawn", "Crash", "Loot");
+	write("%-10s %-14s %-14s %-14s Ships\n", "Save", "Spawn", "Crash", "Loot");
 	foreach (sort(glob("Exploration*.sav", get_dir(SATIS_SAVE_PATH))), string fn) {
-		mapping savefile = parser->low_parse_savefile(fn);
+		mapping savefile = parser->low_parse_savefile(fn, (["pristine": ([])]));
 		sscanf(fn, "Exploration_%s.sav", string label);
 		[string name, array player, mapping attrs] = savefile->players[0];
-		write("%-10s %-14s %-14s %-14s\n", label,
+		//List all object classes, and how far away the furthest from the player is.
+		//Some object classes appear to only be saved when they've been close to us.
+		if (0) {
+			mapping distances = ([]);
+			foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
+				if (obj[4]) continue; //Ignore child objects
+				if (obj[9] == 0.0 && obj[10] == 0.0 && obj[11] == 0.0) continue; //Ignore objects that only exist at the origin
+				if (!distances[obj[1]]) distances[obj[1]] = (["label": ((obj[1] - "\0") / "/")[-1]]);
+				mapping info = distances[obj[1]];
+				float dist = `+(@((obj[9..11][*] - player[*])[*]**2)) ** 0.5 / 100.0;
+				if (dist > info->maxdist) info->maxdist = dist;
+				info->totdist += dist; info->count++;
+			}
+			array dists = values(distances); sort(dists->maxdist, dists);
+			foreach (dists, mapping cls) {
+				write("[%4.0f/%-4.0f] %s\n", cls->totdist / cls->count, cls->maxdist, cls->label);
+			}
+		}
+		array descs = ({ }), dists = ({ });
+		mapping searchfor = ([
+			"/Game/FactoryGame/World/Benefit/DropPod/BP_DropPod.BP_DropPod_C\0": "Pod",
+			"/Game/FactoryGame/World/Benefit/DropPod/BP_Ship.BP_Ship_C\0": "Ship",
+		]);
+		mapping object_counts = ([]);
+		foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
+			object_counts[obj[1]]++;
+			string label = searchfor[obj[1]];
+			if (!label) continue;
+			descs += ({sprintf("%s: %.0f,%.0f,%.0f\n", label, obj[9] / 100.0, obj[10] / 100.0, obj[11] / 100.0)});
+			dists += ({`+(@((obj[9..11][*] - player[*])[*]**2))});
+		}
+		//sort(dists, descs); write(descs * ""); //List them all, nearest to furthest
+		if (label == "4_North" || label == "4a_North") Stdio.write_file(label + ".json", Standards.JSON.encode(savefile->tree, 7));
+		parser->annotate_map(savefile, ({({"crashsites"}), ({"spawners"}), ({"all_loot"}), ({"all_stuff"})}));
+		Stdio.write_file(label + ".png", Image.PNG.encode(savefile->annot_map));
+		write("%-10s %-14s %-14s %-14s %5d\n", label,
 			describe(player, savefile->spawners),
 			describe(player, savefile->crashsites),
 			describe(player, savefile->loot, 2),
+			object_counts["/Game/FactoryGame/World/Benefit/DropPod/BP_Ship.BP_Ship_C\0"],
 		);
 	}
 }

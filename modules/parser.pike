@@ -224,7 +224,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 }
 
 //Parse a savefile, bypassing the cache. Can be used when mutation is intended.
-mapping low_parse_savefile(string|zero fn) {
+mapping low_parse_savefile(string|zero fn, mapping|void options) {
 	if (!fn) {
 		//Pick the latest file and parse that.
 		array files = get_dir(SATIS_SAVE_PATH), paths = SATIS_SAVE_PATH + "/" + files[*];
@@ -234,11 +234,12 @@ mapping low_parse_savefile(string|zero fn) {
 	}
 	Stdio.Buffer data = Stdio.Buffer(Stdio.read_file(SATIS_SAVE_PATH + "/" + fn));
 	data->read_only();
-	return parse_savefile_data(data);
+	return parse_savefile_data(data, options);
 }
 
 //Even lower level helper for when you want to test an in-memory buffer
-mapping parse_savefile_data(Stdio.Buffer data) {
+mapping parse_savefile_data(Stdio.Buffer data, mapping|void options) {
+	if (!options) options = ([]);
 	mapping ret = ([]);
 	//Huh. Unlike the vast majority of games out there, Satisfactory has info on its official wiki.
 	//https://satisfactory.wiki.gg/wiki/Save_files
@@ -409,7 +410,7 @@ mapping parse_savefile_data(Stdio.Buffer data) {
 	//Which witnesses are we aware of?
 	multiset witness_crash = (multiset)ret->crashsites[*][0], witness_spawn = (multiset)ret->spawners[*][0];
 	//Okay. So, for all the loot in the pristine file, do we have both its witnesses?
-	foreach (persist->loot || ([]); string item; mapping locs) {
+	foreach (options->pristine || persist->loot || ([]); string item; mapping locs) {
 		mapping thisloot = haveloot[item];
 		foreach (locs; string key; [int num, string cr, float crdist, string sp, float spdist]) {
 			//If it's in the savefile and not removed, keep it; it's possible the quantity
@@ -569,6 +570,39 @@ void annotate_find_loot(mapping savefile, Image.Image annot_map, array(float) lo
 		annot_map->circle(x, y, 3, 3, 128, 192, 0);
 		annot_map->line(basex, basey, x, y, 32, 64, 0);
 		add_map_marker(savefile, sprintf("%d %s", details[3], L10n(item)), details[0], details[1], details[2]);
+	}
+}
+
+void annotate_crashsites(mapping savefile, Image.Image annot_map) {
+	foreach (savefile->crashsites, array thing) {
+		[int x, int y] = coords_to_pixels(thing[1]);
+		bounds_include(savefile, x, y);
+		annot_map->box(x - 20, y - 20, x + 20, y + 20, 0, 0, 255);
+	}
+}
+
+void annotate_all_loot(mapping savefile, Image.Image annot_map) {
+	foreach (savefile->loot, array thing) {
+		[int x, int y] = coords_to_pixels(thing[2]);
+		bounds_include(savefile, x, y);
+		annot_map->box(x - 20, y - 20, x + 20, y + 20, 0, 255, 0);
+	}
+}
+
+void annotate_spawners(mapping savefile, Image.Image annot_map) {
+	foreach (savefile->spawners, array thing) {
+		[int x, int y] = coords_to_pixels(thing[1]);
+		bounds_include(savefile, x, y);
+		annot_map->box(x - 20, y - 20, x + 20, y + 20, 255, 0, 0);
+	}
+}
+
+void annotate_all_stuff(mapping savefile, Image.Image annot_map) {
+	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
+		if (obj[4]) continue; //Ignore child objects
+		[int x, int y] = coords_to_pixels(obj[9..11]);
+		bounds_include(savefile, x, y);
+		annot_map->box(x - 10, y - 10, x + 10, y + 10, 255, 0, 255);
 	}
 }
 
