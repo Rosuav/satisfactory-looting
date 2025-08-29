@@ -367,7 +367,7 @@ mapping parse_savefile_data(Stdio.Buffer data) {
 			if (objects[i][1] == "/Game/FactoryGame/World/Benefit/DropPod/BP_DropPod.BP_DropPod_C\0")
 				ret->crashsites += ({({(objects[i][3] / ".")[-1], objects[i][9..11]})});
 			if (objects[i][1] == "/Game/FactoryGame/Character/Creature/BP_CreatureSpawner.BP_CreatureSpawner_C\0")
-				ret->spawners += ({({(objects[i][3] / ".")[-1], objects[i][9..11], prop["mSpawnData\0"]})});
+				ret->spawners += ({({(objects[i][3] / ".")[-1], objects[i][9..11], prop["mSpawnData"]})});
 			if (objects[i][1] == "/Game/FactoryGame/Character/Player/Char_Player.Char_Player_C\0")
 				ret->players += ({({(prop->mCachedPlayerName->?value || "Unnamed") - "\0", objects[i][9..11], prop})});
 			if (string label = ([
