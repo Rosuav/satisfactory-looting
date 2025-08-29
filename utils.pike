@@ -63,7 +63,7 @@ string describe(array player, array stuff, int|void idx) {
 		float dist = `+(@((loc[*] - player[*])[*]**2)); //Distance squared from player to this item
 		if (!furthest) nearest = furthest = dist;
 		else if (dist < nearest) nearest = dist;
-		else if (dist > nearest) furthest = dist;
+		else if (dist > furthest) furthest = dist;
 	}
 	return sprintf("%3d %4.0f-%-4.0f", sizeof(stuff), nearest ** 0.5 / 100, furthest ** 0.5 / 100);
 }
