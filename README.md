@@ -77,3 +77,16 @@ TODO: Improve mod support.
 May end up switching all definition loading to parse_config_dir even if there's normally only the
 one file, since it makes mod handling easier. Will need to handle a replace_path block in the mod
 definition, possibly also a dependencies block. See: https://eu4.paradoxwikis.com/Mod_structure
+
+
+
+Falsifiable hypotheses to test
+------------------------------
+
+* Hypothesis: Stuff gets added to the save file in chunks. A chunk gets triggered (by seeing it or
+  getting near it or something) and everything in that chunk gets added.
+* Hypothesis: Staying put and building a Radar Tower will cause stuff to get added due to being
+  able to see it.
+* Hypothesis: Chunks are rigid and there aren't too many of them.
+
+Enumerate all fields and the MapProperty. Count stuff.
