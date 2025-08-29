@@ -56,6 +56,34 @@ void hd() {
 	//see if its prereqs are fulfilled - not sure if I can see that.
 }
 
+string describe(array player, array stuff, int|void idx) {
+	float nearest, furthest;
+	foreach (stuff, array item) {
+		array loc = item[idx || 1]; //Most of the arrays have the location in slot 1, but loot has it in slot 2.
+		float dist = `+(@((loc[*] - player[*])[*]**2)); //Distance squared from player to this item
+		if (!furthest) nearest = furthest = dist;
+		else if (dist < nearest) nearest = dist;
+		else if (dist > nearest) furthest = dist;
+	}
+	return sprintf("%3d %4.0f-%-4.0f", sizeof(stuff), nearest ** 0.5 / 100, furthest ** 0.5 / 100);
+}
+
+@"Count the things that might and might not be in the savefile":
+void counter() {
+	object parser = G->bootstrap("modules/parser.pike");
+	write("%-10s %-14s %-14s %-14s\n", "Save", "Spawn", "Crash", "Loot");
+	foreach (sort(glob("Exploration*.sav", get_dir(SATIS_SAVE_PATH))), string fn) {
+		mapping savefile = parser->low_parse_savefile(fn);
+		sscanf(fn, "Exploration_%s.sav", string label);
+		[string name, array player, mapping attrs] = savefile->players[0];
+		write("%-10s %-14s %-14s %-14s\n", label,
+			describe(player, savefile->spawners),
+			describe(player, savefile->crashsites),
+			describe(player, savefile->loot, 2),
+		);
+	}
+}
+
 @"Edited as needed, does what's needed":
 void test() {
 	trace_on_signal();
