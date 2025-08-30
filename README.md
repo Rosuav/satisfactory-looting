@@ -96,3 +96,4 @@ NutBush/BerryBush/Shroom, CrashSiteDebris, MercerShrine, Crystal, CreatureSpawne
 
 Is BP_Ship_C just another piece of debris? See if it's removable - or more specifically, see if
 clearing a crash site gets rid of one of them.
+- Seems it is, I think. So it's not particularly useful.
