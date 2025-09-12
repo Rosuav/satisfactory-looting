@@ -532,6 +532,10 @@ mapping(string:int) all_country_modifiers(mapping data, mapping country) {
 	_incorporate(data, country, modifiers, L10N("prestige"), G->CFG->static_modifiers->prestige, threeplace(country->prestige), 100000);
 	_incorporate(data, country, modifiers, L10N("army_tradition"), G->CFG->static_modifiers->army_tradition, threeplace(country->army_tradition), 100000);
 
+	//Governing capacity can be expanded by spending reform progress.
+	if (int exp = (int)country->num_expanded_administration)
+		_incorporate(data, country, modifiers, L10N("expand_administation_modifier"), G->CFG->static_modifiers->expand_administation_modifier, exp, 1);
+
 	//More modifier types to incorporate:
 	//- Religious modifiers (icons, cults, etc)
 	//- Government type modifiers (eg march, vassal, colony)
@@ -2447,8 +2451,15 @@ void analyze_states(mapping data, string tag, mapping write) {
 			t->cost_now += cost; t->cost_state += cost_state;
 		}
 	}
+	mapping counmod = all_country_modifiers(data, country);
+	int capac = counmod->governing_capacity //Base value plus all additive modifiers (eg "+50 governing capacity")
+		* (counmod->governing_capacity_modifier + 1000) / 1000; //Multiplicative modifiers (eg "+10% governing capacity")
+	array sources = counmod->_sources->governing_capacity;
+	if (array mul = counmod->_sources->governing_capacity_modifier)
+		sources += mul[*] + "%o"; //TODO: Show signed percentage not permillage (eg +20% rather than +200‰)
 	write->states = ([
-		"governing_capacity": all_country_modifiers(data, country)->governing_capacity,
+		"governing_capacity": capac,
+		"governing_capacity_sources": sources,
 		"used_governing_capacity": threeplace(country->used_governing_capacity),
 		"territories_with_full_cores": terr,
 	]);

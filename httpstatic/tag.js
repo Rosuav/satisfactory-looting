@@ -690,6 +690,7 @@ section("states", "States", "States and territories", state => {
 		P([
 			"Have used ", threeplace(state.states.used_governing_capacity),
 			" out of ", threeplace(state.states.governing_capacity),
+			BUTTON({class: "show_sources", ".effect_sources": state.states.governing_capacity_sources}, "🔍"),
 			" governing capacity: ", GREENRED(capac, " available", " over"),
 		]),
 		//Not currently a sortable for two reasons: the rowspans (which want to stay on the first displayed row),
@@ -1125,6 +1126,16 @@ on("click", ".show_relations", e => {
 		),
 	]);
 	replace_content("#detailsdlg h3", "Detailed relations breakdown");
+	DOM("#detailsdlg").showModal();
+});
+
+on("click", ".show_sources", e => {
+	const sources = e.match.effect_sources;
+	replace_content("#detailsmain", [
+		P(["Sources"]), //TODO: Say "sources of <X>"
+		UL(sources.map(s => LI(s))), //TODO: Get the value separately from the description, and make a two column table
+	]);
+	replace_content("#detailsdlg h3", "Detailed effect breakdown");
 	DOM("#detailsdlg").showModal();
 });
 
