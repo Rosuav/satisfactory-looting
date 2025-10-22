@@ -558,9 +558,9 @@ void annotate_find_loot(mapping savefile, Image.Image annot_map, array(float) lo
 	sort(distances, details);
 	array found = ({ });
 	foreach (details[..2]; int i; array details) {
-		savefile->found += ({sprintf("Found %d %s at %.0f,%.0f,%.0f - %.0f away\n",
+		savefile->found += ({sprintf("Found %d %s at %.0f,%.0f at %.0fm - %.0f away\n",
 			details[3], L10n(item),
-			details[0], details[1], details[2],
+			details[0] / 100.0, details[1] / 100.0, details[2] / 100.0,
 			(distances[i] ** 0.5) / 100.0)});
 		//Mark the location and draw a line to it
 		[int x, int y] = coords_to_pixels(details);
