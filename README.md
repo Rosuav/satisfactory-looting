@@ -27,6 +27,12 @@ TODO: Currently, creation of map markers fails if there are no other markers in 
 savefile. How can we synthesize the first ever map marker? Is there anything else that
 has to be created in parallel?
 
+TODO: Add "All nearby" loot type, mainly for crash sites. Find any type of loot but
+only within the "nearby" threshold (100m?), don't stop at 3.
+
+TODO: Rerollable flag??
+TODO: Make new pristine file for 1.1 - spawners may have changed
+
 
 Europa Universalis IV savefile parser
 -------------------------------------
