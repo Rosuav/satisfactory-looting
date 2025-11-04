@@ -85,6 +85,13 @@ one file, since it makes mod handling easier. Will need to handle a replace_path
 definition, possibly also a dependencies block. See: https://eu4.paradoxwikis.com/Mod_structure
 
 
+NOTE: EU5 is imminent and a lot of the above TODOs will be irrelevant unless they apply also to EU5.
+
+TODO: Have a "for=" parameter eg /tag/Rosuav?for=Stephen+Angelico
+Clicking on a province will send the GOTO message to your own tag, but all display details will be
+for the target. If I ever add authentication to this, you would authenticate with your own tag,
+with the target granting you permission to view it.
+
 
 Falsifiable hypotheses to test
 ------------------------------
