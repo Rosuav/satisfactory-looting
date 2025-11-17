@@ -93,6 +93,19 @@ for the target. If I ever add authentication to this, you would authenticate wit
 with the target granting you permission to view it.
 
 
+Europa Universalis V
+--------------------
+
+This is all plans and TODOs, and may change before implementation.
+
+* Saves are "unreadable" if you aren't in debug mode. Are they encrypted or is it something simple?
+  They looked like maybe they were compressed. Explore this. (This is w/o Ironman which will of
+  course encrypt.)
+* Make a new endpoint /eu5/ and maybe eventually shift /session to /satisfactory ? Not using /file.
+* A lot of things will be unnecessary since they're now in core, so this will start fresh with the
+  things that I deem necessary during actual gameplay.
+
+
 Falsifiable hypotheses to test
 ------------------------------
 
