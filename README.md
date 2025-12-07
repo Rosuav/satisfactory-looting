@@ -84,6 +84,9 @@ May end up switching all definition loading to parse_config_dir even if there's 
 one file, since it makes mod handling easier. Will need to handle a replace_path block in the mod
 definition, possibly also a dependencies block. See: https://eu4.paradoxwikis.com/Mod_structure
 
+TODO: Count the total number of provinces with the local_fortress modifier, and how many you have.
+If I'm understanding correctly, the total will only ever increase. (It's the 25% local defense till end of game.)
+
 
 NOTE: EU5 is imminent and a lot of the above TODOs will be irrelevant unless they apply also to EU5.
 
