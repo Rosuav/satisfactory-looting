@@ -7,6 +7,7 @@ mapping(int:string) id_to_string = ([
 	0x00e1: "type",
  	0x00ee: "version",
  	0x00f0: "data",
+	0x025a: "top",
 	0x0351: "list",
 	0x0352: "item",
  	0x0384: "flag",
@@ -18,9 +19,11 @@ mapping(int:string) id_to_string = ([
  	0x096f: "playthrough_name",
  	0x0971: "save_label",
  	0x09de: "metadata",
+	0x2915: "power",
  	0x2ce7: "enabled_dlcs",
  	0x2dc0: "locations",
  	0x2f44: "current_age",
+	0x314a: "language_manager",
  	0x3224: "start_of_day",
  	0x3237: "compatibility",
  	0x3238: "locations_hash",
@@ -87,6 +90,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			continue;
 		}
 		if (arrayp(ret)) werror("WARNING: Mixed array/map at pos %d\n", sizeof(buf));
+		//TODO: If the ID is 0d3e, check string_lookup. Probably also if it's 0d40.
 		if (!id_to_string[id]) {
 			werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
 			id_to_string[id] = sprintf("#%04x", id);
@@ -104,6 +108,12 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				[value] = buf->sscanf("%-4c");
 				break;
 			case 0x000f: [value] = buf->sscanf("%-2H"); break;
+			case 0x0167:
+				//This is shown in the text version as a float.
+				//For now, storing the integer value; the true value is this divided by 100000.0
+				//(note that this is a change from EU4 where fixed point was to be divided by 1000.0).
+				[value] = buf->sscanf("%-8c");
+				break;
 			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
 			case 0x0d40: value = last_string = string_lookup[buf->read_int8()]; break;
 			case 0x0d3e: value = last_string = string_lookup[buf->read_le_int(2)]; break;
