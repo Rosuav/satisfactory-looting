@@ -46,29 +46,19 @@ mapping(int:string) id_to_string = ([
 array string_lookup = ({ });
 string last_string = "?";
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
-	mapping|array ret = ([]);
-	//werror("> Entering %s\n", path);
+	mapping map = ([]); array arr = ({ });
+	int startpos = sizeof(buf);
+	//werror("> [%d] Entering %s\n", startpos, path);
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		if (pos == 173054970 || pos == 173055124) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..64]);
+		if (pos == 173054894) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..64]);
 		int|string id = buf->read_le_int(2);
-		if (id == 4) break; //End of mapping
+		if (id == 4) break; //End of object
 		if (id == 0) {/*write("NULL entry at %d\n", pos);*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
-		if (id == 3 || id == 12 || id == 15) {
-			//It's an array entry. Three possibilities:
-			//1) ret is an empty mapping - this is the first entry. Replace it with an array and carry on.
-			//2) ret is an array - no probs, add this and go
-			//3) ret is a non-empty mapping. We have a mixed map/array. Not good.
-			if (mappingp(ret)) {
-				if (sizeof(ret)) werror("WARNING: Mixed map/array at pos %d\n", pos);
-				ret = ({ });
-			}
-			//ID 15 is for strings; ID 3 is for mappings; ID 12 is for integers.
-			if (id == 15) ret += buf->sscanf("%-2H");
-			else if (id == 12) ret += buf->sscanf("%-4c");
-			else ret += ({read_maparray(buf, path + "[]")});
-			continue;
-		}
+		//IDs 3, 12, and 15 have only ever been used for arrays. Unlike ID 20, which is used for both.
+		if (id == 15) {arr += buf->sscanf("%-2H"); continue;}
+		if (id == 12) {arr += buf->sscanf("%-4c"); continue;}
+		if (id == 3) {arr += ({read_maparray(buf, path + "[]")}); continue;}
 		if (id == 0x4b50) {
 			//In a non-debug savefile, everything after the metadata is packaged up as a zip file.
 			//It can be recognized by the "PK" signature (50 4b), which is then followed by 03 04.
@@ -96,7 +86,6 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			werror("Switching to compressed gamestate, %d bytes.\n", sizeof(buf));
 			continue;
 		}
-		if (arrayp(ret)) werror("WARNING: Mixed array/map at pos %d\n", pos);
 		//If the ID is 0d3e, check string_lookup. TODO: Probably also if it's 0d40?
 		if (id == 0x0d3e) id = last_string = string_lookup[buf->read_le_int(2)];
 		//If the ID is 0017, it's an immediate string. I have NO idea why "resolution_manager"
@@ -111,8 +100,11 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			}
 			id = id_to_string[id];
 		}
-		[int unk, int type] = buf->sscanf("%-2c%-2c");
-		if (unk != 1) werror("WARNING: Not 01 00 before type, ID %s, type %04x, pos %d, path %s\n", id, unk, pos, path);
+		[int marker] = buf->sscanf("%-2c");
+		//If the key is not followed by 01 00, it's an array entry; so far only seen with ID 20.
+		//When that happens, the next entry follows immediately, so put back the bytes just read.
+		if (marker != 1) {buf->unread(2); arr += ({id}); continue;}
+		[int type] = buf->sscanf("%-2c");
 		mixed value;
 		switch (type) {
 			case 0x0003: value = read_maparray(buf, path + "-" + id); break;
@@ -144,15 +136,17 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x2d06: value = "area"; break;
 			case 0x0165: value = "none"; break;
 			case 0x355d: value = "law"; break;
-			case 0x0356: value = "policy"; break;
+			case 0x355e: value = "policy"; break;
+			case 0x000e: value = "yes"; break; //Possibly should use Val.true here
 			default:
 				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", type, pos, (array)((string)buf)[..16], path, last_string);
 				exit(1);
 		}
-		ret[id] = value;
+		map[id] = value;
 	}
+	if (sizeof(map) && sizeof(arr)) werror("WARNING: Mixed map/array at pos %d\n", startpos);
 	//werror("< Exiting %s\n", path);
-	return ret;
+	return sizeof(arr) ? arr : map;
 }
 
 int main() {
