@@ -108,6 +108,64 @@ This is all plans and TODOs, and may change before implementation.
 * A lot of things will be unnecessary since they're now in core, so this will start fresh with the
   things that I deem necessary during actual gameplay.
 
+Savefile notes
+* The beginning of a save file is eg "SAV02003fb9bd370004e75d00000000\n" if text
+* The beginning of a save file is eh "SAV0203d64d49f0000634fd00000000\n" if binary
+* File begins "SAV", seems to be fixed
+* Next two are possibly a version number? Was "01" for earlier files, is now "02". I don't think
+  this has anything to do with Ironman (which I'm not going to concern myself with greatly, but
+  it would be nice if I could at least recognize them and say "hey, this is an ironman save").
+* Next two are "03" for binary, "00" for text. Might have more flags.
+* Then eight digits of a save ID of some sort, or maybe a checksum: "3fb9bd37". It changes from 
+  one save to another within a campaign.
+* Four digits "0004" for text, "0006" for binary
+* Four digits of some kind of checksum, but not the same one displayed to the user
+* Eight zeroes. All of these are ASCII lowercase hex.
+* Newline - even in binary format.
+
+* Every value appears to have an introduction consisting of a two-byte value likely representing
+  a keyword.
+  - 0000 null?? Seems to be followed by another 00 00??
+  - 0003 ?? array entry?
+  - 000f ?? array entry, no keyword?
+  - 0004 End of mapping/array
+  - 006e "speed"
+  - 00f0 "data"
+  - 0384 "flag"
+  - 0555 "variables"
+  - 09de "metadata"
+  - 06b3 "random_seed"
+  - 06b4 "random_count"
+  - 06b5 "date"
+  - 096e "playthrough_id"
+  - 096f "playthrough_name"
+  - 0971 "save_label"
+  - 00ee "version"
+  - 2ce7 "enabled_dlcs"
+  - 2dc0 "locations"
+  - 2f44 "current_age"
+  - 3234 "start_of_day"
+  - 3237 "compatibility"
+  - 3238 "locations_hash"
+  - 3477 "code_version_info"
+  - 3478 "code_hash_long"
+  - 3479 "code_hash_short"
+  - 347a "code_timestamp"
+  - 347b "code_branch"
+  - 347c "game_code_info"
+  - 347d "engine_code_info"
+  - 35c3 "code_commit"
+* Then there's a four byte value, or two two-byte values, which may be a type marker
+  - "01 00 03 00" mapping/array
+  - "01 00 0c 00" date? or 32-bit integer?
+  - "01 00 9c 02" integer (32-bit)
+  - "01 00 0f 00" string
+  - "01 00 14 00" integer (32-bit) - maybe unsigned?
+  - "01 00 40 0d" Take the next string from string_lookup
+* Strings are stored %-2H and are probably UTF-8 but I haven't confirmed this
+* Date might be stored as a number of hours since game start??? 0x036012e8 means 1464-5-18 at 16:00
+* Start date of 1337-4-1 and is 0x034f14a8
+
 
 Falsifiable hypotheses to test
 ------------------------------
