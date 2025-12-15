@@ -1,7 +1,12 @@
 mapping(int:string) id_to_string = ([
+	0x001b: "name",
  	0x006e: "speed",
+	0x00db: "identity",
+	0x00e1: "type",
  	0x00ee: "version",
  	0x00f0: "data",
+	0x0351: "list",
+	0x0352: "item",
  	0x0384: "flag",
  	0x0555: "variables",
  	0x06b3: "random_seed",
@@ -28,14 +33,16 @@ mapping(int:string) id_to_string = ([
 	0x3bb5: "player_country_name",
 ]);
 
+array string_lookup = ({ });
+string last_string = "?";
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping|array ret = ([]);
-	array string_lookup = ({ }); int sl_used = 0;
+	//werror("> Entering %s\n", path);
 	while (sizeof(buf)) {
 		int id = buf->read_le_int(2);
 		if (id == 4) break; //End of mapping
-		if (id == 0) {write("NULL entry at %d\n", sizeof(buf)); continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
-		if (id == 15) {
+		if (id == 0) {/*write("NULL entry at %d\n", sizeof(buf));*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
+		if (id == 3 || id == 15) {
 			//It's an array entry. Three possibilities:
 			//1) ret is an empty mapping - this is the first entry. Replace it with an array and carry on.
 			//2) ret is an array - no probs, add this and go
@@ -45,7 +52,8 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				ret = ({ });
 			}
 			//ID 15 seems only to permit string elements. ID 3 might be for mapping elements??
-			ret += buf->sscanf("%-2H");
+			if (id == 15) ret += buf->sscanf("%-2H");
+			else ret += ({read_maparray(buf, path + "[]")});
 			continue;
 		}
 		if (id == 0x4b50) {
@@ -77,7 +85,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		}
 		if (arrayp(ret)) werror("WARNING: Mixed array/map at pos %d\n", sizeof(buf));
 		if (!id_to_string[id]) {
-			werror("UNKNOWN MAPPING KEY ID %04x\n", id);
+			werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
 			id_to_string[id] = sprintf("#%04x", id);
 		}
 		[int unk, int type] = buf->sscanf("%-2c%-2c");
@@ -93,17 +101,21 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				[value] = buf->sscanf("%-4c");
 				break;
 			case 0x000f: [value] = buf->sscanf("%-2H"); break;
-			case 0x0d40:
-				werror("String lookup %d, xtra %d\n", sl_used, buf->read(1)[0]);
-				value = string_lookup[sl_used++];
-				break;
+			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
+			case 0x0d40: value = last_string = string_lookup[buf->read_int8()]; break;
+			case 0x0d3e: value = last_string = string_lookup[buf->read_le_int(2)]; break;
+			//This might be an enumeration??
+			case 0x2df2: value = "char"; break;
+			case 0x02d2: value = "value"; break;
+			case 0x0500: value = "boolean"; break;
+			case 0x2ddf: value = "loc"; break;
 			default:
-				werror("UNKNOWN DATA TYPE %04x at pos %d\n", type, sizeof(buf));
-				return ret;
+				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s\n", type, sizeof(buf), (array)((string)buf)[..16], path);
+				exit(1);
 		}
 		ret[id_to_string[id]] = value;
 	}
-	if (sizeof(string_lookup)) werror("Got %d string_lookups, used %d, unused %d\n", sizeof(string_lookup), sl_used, sizeof(string_lookup) - sl_used);
+	//werror("< Exiting %s\n", path);
 	return ret;
 }
 
@@ -121,6 +133,6 @@ int main() {
 	if (header[15..18] != "0006") exit(1, "Bad type %O\n", header[15..18]);
 	if (header[23..] != "00000000") exit(1, "Bad end-of-header %O\n", header[23..]);
 	mapping toplevel = read_maparray(buf, "base");
-	toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
+	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
 	werror("Toplevel: %O\n", toplevel);
 }
