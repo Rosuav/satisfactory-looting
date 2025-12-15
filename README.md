@@ -110,7 +110,7 @@ This is all plans and TODOs, and may change before implementation.
 
 Savefile notes
 * The beginning of a save file is eg "SAV02003fb9bd370004e75d00000000\n" if text
-* The beginning of a save file is eh "SAV0203d64d49f0000634fd00000000\n" if binary
+* The beginning of a save file is eg "SAV0203d64d49f0000634fd00000000\n" if binary
 * File begins "SAV", seems to be fixed
 * Next two are possibly a version number? Was "01" for earlier files, is now "02". I don't think
   this has anything to do with Ironman (which I'm not going to concern myself with greatly, but
@@ -130,17 +130,17 @@ Savefile notes
   - 000f ?? array entry, no keyword?
   - 0004 End of mapping/array
   - 006e "speed"
+  - 00ee "version"
   - 00f0 "data"
   - 0384 "flag"
   - 0555 "variables"
-  - 09de "metadata"
   - 06b3 "random_seed"
   - 06b4 "random_count"
   - 06b5 "date"
   - 096e "playthrough_id"
   - 096f "playthrough_name"
   - 0971 "save_label"
-  - 00ee "version"
+  - 09de "metadata"
   - 2ce7 "enabled_dlcs"
   - 2dc0 "locations"
   - 2f44 "current_age"
