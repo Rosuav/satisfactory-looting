@@ -1,4 +1,31 @@
 mapping(int:string) id_to_string = ([
+ 	0x006e: "speed",
+ 	0x00ee: "version",
+ 	0x00f0: "data",
+ 	0x0384: "flag",
+ 	0x0555: "variables",
+ 	0x06b3: "random_seed",
+ 	0x06b4: "random_count",
+ 	0x06b5: "date",
+ 	0x096e: "playthrough_id",
+ 	0x096f: "playthrough_name",
+ 	0x0971: "save_label",
+ 	0x09de: "metadata",
+ 	0x2ce7: "enabled_dlcs",
+ 	0x2dc0: "locations",
+ 	0x2f44: "current_age",
+ 	0x3234: "start_of_day",
+ 	0x3237: "compatibility",
+ 	0x3238: "locations_hash",
+ 	0x3477: "code_version_info",
+ 	0x3478: "code_hash_long",
+ 	0x3479: "code_hash_short",
+ 	0x347a: "code_timestamp",
+ 	0x347b: "code_branch",
+ 	0x347c: "game_code_info",
+ 	0x347d: "engine_code_info",
+ 	0x35c3: "code_commit",
+	0x3bb5: "player_country_name",
 ]);
 
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
@@ -69,5 +96,6 @@ int main() {
 	if (header[15..18] != "0006") exit(1, "Bad type %O\n", header[15..18]);
 	if (header[23..] != "00000000") exit(1, "Bad end-of-header %O\n", header[23..]);
 	mapping toplevel = read_maparray(buf, "base");
-	werror("Toplevel: %O\n", indices(toplevel));
+	toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
+	werror("Toplevel: %O\n", toplevel->metadata);
 }
