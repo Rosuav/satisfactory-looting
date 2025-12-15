@@ -1,5 +1,7 @@
 mapping(int:string) id_to_string = ([
 	0x001b: "name",
+	0x0041: "object",
+ 	0x006d: "duration",
  	0x006e: "speed",
 	0x00db: "identity",
 	0x00e1: "type",
@@ -42,7 +44,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		int id = buf->read_le_int(2);
 		if (id == 4) break; //End of mapping
 		if (id == 0) {/*write("NULL entry at %d\n", sizeof(buf));*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
-		if (id == 3 || id == 15) {
+		if (id == 3 || id == 12 || id == 15) {
 			//It's an array entry. Three possibilities:
 			//1) ret is an empty mapping - this is the first entry. Replace it with an array and carry on.
 			//2) ret is an array - no probs, add this and go
@@ -51,8 +53,9 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				if (sizeof(ret)) werror("WARNING: Mixed map/array at pos %d\n", sizeof(buf));
 				ret = ({ });
 			}
-			//ID 15 seems only to permit string elements. ID 3 might be for mapping elements??
+			//ID 15 is for strings; ID 3 is for mappings; ID 12 is for integers.
 			if (id == 15) ret += buf->sscanf("%-2H");
+			else if (id == 12) ret += buf->sscanf("%-4c");
 			else ret += ({read_maparray(buf, path + "[]")});
 			continue;
 		}
@@ -109,8 +112,12 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x02d2: value = "value"; break;
 			case 0x0500: value = "boolean"; break;
 			case 0x2ddf: value = "loc"; break;
+			case 0x2cd6: value = "ctry"; break;
+			case 0x393e: value = "formable_country"; break;
+			case 0x32e3: value = "international_organization"; break;
+			case 0x2d06: value = "area"; break;
 			default:
-				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s\n", type, sizeof(buf), (array)((string)buf)[..16], path);
+				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", type, sizeof(buf), (array)((string)buf)[..16], path, last_string);
 				exit(1);
 		}
 		ret[id_to_string[id]] = value;
