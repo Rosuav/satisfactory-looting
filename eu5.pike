@@ -49,16 +49,18 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping|array ret = ([]);
 	//werror("> Entering %s\n", path);
 	while (sizeof(buf)) {
+		int pos = sizeof(buf);
+		if (pos == 173054970 || pos == 173055124) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..64]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of mapping
-		if (id == 0) {/*write("NULL entry at %d\n", sizeof(buf));*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
+		if (id == 0) {/*write("NULL entry at %d\n", pos);*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
 		if (id == 3 || id == 12 || id == 15) {
 			//It's an array entry. Three possibilities:
 			//1) ret is an empty mapping - this is the first entry. Replace it with an array and carry on.
 			//2) ret is an array - no probs, add this and go
 			//3) ret is a non-empty mapping. We have a mixed map/array. Not good.
 			if (mappingp(ret)) {
-				if (sizeof(ret)) werror("WARNING: Mixed map/array at pos %d\n", sizeof(buf));
+				if (sizeof(ret)) werror("WARNING: Mixed map/array at pos %d\n", pos);
 				ret = ({ });
 			}
 			//ID 15 is for strings; ID 3 is for mappings; ID 12 is for integers.
@@ -94,9 +96,14 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			werror("Switching to compressed gamestate, %d bytes.\n", sizeof(buf));
 			continue;
 		}
-		if (arrayp(ret)) werror("WARNING: Mixed array/map at pos %d\n", sizeof(buf));
+		if (arrayp(ret)) werror("WARNING: Mixed array/map at pos %d\n", pos);
 		//If the ID is 0d3e, check string_lookup. TODO: Probably also if it's 0d40?
 		if (id == 0x0d3e) id = last_string = string_lookup[buf->read_le_int(2)];
+		//If the ID is 0017, it's an immediate string. I have NO idea why "resolution_manager"
+		//is stored immediate where all the others are by their IDs.
+		else if (id == 0x0017) [id] = buf->sscanf("%-2H");
+		//If the ID is 0014, the key is a number, not a string. Casting to string so we can save as JSON if desired.
+		else if (id == 0x0014) id = (string)buf->read_le_int(4);
 		else {
 			if (!id_to_string[id]) {
 				werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
@@ -105,7 +112,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			id = id_to_string[id];
 		}
 		[int unk, int type] = buf->sscanf("%-2c%-2c");
-		if (unk != 1) werror("WARNING: Not 01 00 before type, ID %s, type %04x, pos %d, path %s\n", id, unk, sizeof(buf), path);
+		if (unk != 1) werror("WARNING: Not 01 00 before type, ID %s, type %04x, pos %d, path %s\n", id, unk, pos, path);
 		mixed value;
 		switch (type) {
 			case 0x0003: value = read_maparray(buf, path + "-" + id); break;
@@ -135,8 +142,11 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x393e: value = "formable_country"; break;
 			case 0x32e3: value = "international_organization"; break;
 			case 0x2d06: value = "area"; break;
+			case 0x0165: value = "none"; break;
+			case 0x355d: value = "law"; break;
+			case 0x0356: value = "policy"; break;
 			default:
-				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", type, sizeof(buf), (array)((string)buf)[..16], path, last_string);
+				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", type, pos, (array)((string)buf)[..16], path, last_string);
 				exit(1);
 		}
 		ret[id] = value;
