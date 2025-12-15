@@ -14,7 +14,7 @@ mapping(int:string) id_to_string = ([
  	0x2ce7: "enabled_dlcs",
  	0x2dc0: "locations",
  	0x2f44: "current_age",
- 	0x3234: "start_of_day",
+ 	0x3224: "start_of_day",
  	0x3237: "compatibility",
  	0x3238: "locations_hash",
  	0x3477: "code_version_info",
@@ -30,6 +30,7 @@ mapping(int:string) id_to_string = ([
 
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping|array ret = ([]);
+	array string_lookup = ({ }); int sl_used = 0;
 	while (sizeof(buf)) {
 		int id = buf->read_le_int(2);
 		if (id == 4) break; //End of mapping
@@ -66,7 +67,13 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			}
 			//Note that we have to read both files before we can parse, as the string_lookup is generally
 			//placed *after* the gamestate. No big deal as we have to have it all in memory anyway.
-			return ret;
+			buf = Stdio.Buffer(files->string_lookup); buf->read_only();
+			[int unk1, int count, int unk3] = buf->sscanf("%c%-2c%-2c");
+			while (sizeof(buf)) string_lookup += buf->sscanf("%-2H");
+			//Sweet. Now we can switch out to the compressed game state.
+			buf = Stdio.Buffer(files->gamestate); buf->read_only();
+			werror("Switching to compressed gamestate, %d bytes.\n", sizeof(buf));
+			continue;
 		}
 		if (arrayp(ret)) werror("WARNING: Mixed array/map at pos %d\n", sizeof(buf));
 		if (!id_to_string[id]) {
@@ -86,13 +93,17 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				[value] = buf->sscanf("%-4c");
 				break;
 			case 0x000f: [value] = buf->sscanf("%-2H"); break;
-			case 0x0d40: werror("FIXME: Need string_lookup\n"); value = ""; break;
+			case 0x0d40:
+				werror("String lookup %d, xtra %d\n", sl_used, buf->read(1)[0]);
+				value = string_lookup[sl_used++];
+				break;
 			default:
 				werror("UNKNOWN DATA TYPE %04x at pos %d\n", type, sizeof(buf));
 				return ret;
 		}
 		ret[id_to_string[id]] = value;
 	}
+	if (sizeof(string_lookup)) werror("Got %d string_lookups, used %d, unused %d\n", sizeof(string_lookup), sl_used, sizeof(string_lookup) - sl_used);
 	return ret;
 }
 
@@ -111,5 +122,5 @@ int main() {
 	if (header[23..] != "00000000") exit(1, "Bad end-of-header %O\n", header[23..]);
 	mapping toplevel = read_maparray(buf, "base");
 	toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
-	werror("Toplevel: %O\n", toplevel->metadata);
+	werror("Toplevel: %O\n", toplevel);
 }
