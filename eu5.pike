@@ -44,7 +44,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping|array ret = ([]);
 	//werror("> Entering %s\n", path);
 	while (sizeof(buf)) {
-		int id = buf->read_le_int(2);
+		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of mapping
 		if (id == 0) {/*write("NULL entry at %d\n", sizeof(buf));*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
 		if (id == 3 || id == 12 || id == 15) {
@@ -90,16 +90,20 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			continue;
 		}
 		if (arrayp(ret)) werror("WARNING: Mixed array/map at pos %d\n", sizeof(buf));
-		//TODO: If the ID is 0d3e, check string_lookup. Probably also if it's 0d40.
-		if (!id_to_string[id]) {
-			werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
-			id_to_string[id] = sprintf("#%04x", id);
+		//If the ID is 0d3e, check string_lookup. TODO: Probably also if it's 0d40?
+		if (id == 0x0d3e) id = last_string = string_lookup[buf->read_le_int(2)];
+		else {
+			if (!id_to_string[id]) {
+				werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
+				id_to_string[id] = sprintf("#%04x", id);
+			}
+			id = id_to_string[id];
 		}
 		[int unk, int type] = buf->sscanf("%-2c%-2c");
-		if (unk != 1) werror("WARNING: Not 01 00 before type, ID %04x, type %04x, pos %d, path %s\n", id, unk, sizeof(buf), path);
+		if (unk != 1) werror("WARNING: Not 01 00 before type, ID %s, type %04x, pos %d, path %s\n", id, unk, sizeof(buf), path);
 		mixed value;
 		switch (type) {
-			case 0x0003: value = read_maparray(buf, path + "-" + id_to_string[id]); break;
+			case 0x0003: value = read_maparray(buf, path + "-" + id); break;
 			case 0x000c: //32-bit integer, used for date and version
 			case 0x029c: //32-bit integer, used for general-purpose numbers
 			case 0x0014: //32-bit integer... for something else.
@@ -130,7 +134,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", type, sizeof(buf), (array)((string)buf)[..16], path, last_string);
 				exit(1);
 		}
-		ret[id_to_string[id]] = value;
+		ret[id] = value;
 	}
 	//werror("< Exiting %s\n", path);
 	return ret;
