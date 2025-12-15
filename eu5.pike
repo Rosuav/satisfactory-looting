@@ -52,6 +52,20 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			//It can be recognized by the "PK" signature (50 4b), which is then followed by 03 04.
 			//Pike comes with a Filesystem.Zip interface but it's not really optimized for this
 			//sort of job, so instead we do our own parsing.
+			if (buf->read(2) != "\3\4") werror("WARNING: MALFORMED ZIP ARCHIVE\n");
+			mapping files = ([]);
+			while (sizeof(buf)) {
+				[int minver, int flags, int comp, int ignore, int compsz, int decompsz, int fnlen, int xtralen] = buf->sscanf("%-2c%-2c%-2c%-8c%-4c%-4c%-2c%-2c");
+				string fn = buf->read(fnlen);
+				string xtra = buf->read(xtralen);
+				string raw = buf->read(compsz);
+				string decomp = Gz.inflate(-15)->inflate(raw);
+				//assert sizeof(decomp) == decompsz
+				files[fn] = decomp;
+				if (buf->read(4) != "PK\3\4") break; //After all files, there's a "PK\1\2" central directory, which we don't need
+			}
+			//Note that we have to read both files before we can parse, as the string_lookup is generally
+			//placed *after* the gamestate. No big deal as we have to have it all in memory anyway.
 			return ret;
 		}
 		if (arrayp(ret)) werror("WARNING: Mixed array/map at pos %d\n", sizeof(buf));
