@@ -45,13 +45,14 @@ mapping(int:string) id_to_string = ([
 
 array string_lookup = ({ });
 string last_string = "?";
+array(int) id_sequence = ({ }), string_sequence = ({ });
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
 	//werror("> [%d] Entering %s\n", startpos, path);
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		if (pos == 173054894) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..64]);
+		//if (pos == 173054894) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..64]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
 		if (id == 0) {/*write("NULL entry at %d\n", pos);*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
@@ -84,6 +85,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			//Sweet. Now we can switch out to the compressed game state.
 			buf = Stdio.Buffer(files->gamestate); buf->read_only();
 			werror("Switching to compressed gamestate, %d bytes.\n", sizeof(buf));
+			id_sequence = ({ });
 			continue;
 		}
 		//If the ID is 0d3e, check string_lookup. TODO: Probably also if it's 0d40?
@@ -144,7 +146,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		}
 		map[id] = value;
 	}
-	if (sizeof(map) && sizeof(arr)) werror("WARNING: Mixed map/array at pos %d\n", startpos);
+	if (sizeof(map) && sizeof(arr)) werror("WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
 	//werror("< Exiting %s\n", path);
 	return sizeof(arr) ? arr : map;
 }
@@ -164,5 +166,5 @@ int main() {
 	if (header[23..] != "00000000") exit(1, "Bad end-of-header %O\n", header[23..]);
 	mapping toplevel = read_maparray(buf, "base");
 	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
-	werror("Toplevel: %O\n", toplevel);
+	werror("Toplevel: %O\n", indices(toplevel));
 }
