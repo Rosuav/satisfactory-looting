@@ -45,7 +45,7 @@ mapping(int:string) id_to_string = ([
 
 array string_lookup = ({ });
 string last_string = "?";
-array(int) id_sequence = ({ }), string_sequence = ({ });
+array(int) id_sequence = ({ });
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
@@ -57,8 +57,8 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		if (id == 4) break; //End of object
 		if (id == 0) {/*write("NULL entry at %d\n", pos);*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
 		//IDs 3, 12, and 15 have only ever been used for arrays. Unlike ID 20, which is used for both.
-		if (id == 15) {arr += buf->sscanf("%-2H"); continue;}
-		if (id == 12) {arr += buf->sscanf("%-4c"); continue;}
+		if (id == 15) {arr += buf->sscanf("%-2H"); id_sequence += ({arr[-1]}); continue;}
+		if (id == 12) {arr += buf->sscanf("%-4c"); id_sequence += ({arr[-1]}); continue;}
 		if (id == 3) {arr += ({read_maparray(buf, path + "[]")}); continue;}
 		if (id == 0x4b50) {
 			//In a non-debug savefile, everything after the metadata is packaged up as a zip file.
@@ -105,7 +105,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		[int marker] = buf->sscanf("%-2c");
 		//If the key is not followed by 01 00, it's an array entry; so far only seen with ID 20.
 		//When that happens, the next entry follows immediately, so put back the bytes just read.
-		if (marker != 1) {buf->unread(2); arr += ({id}); continue;}
+		if (marker != 1) {buf->unread(2); arr += ({id}); id_sequence += ({id}); continue;}
 		[int type] = buf->sscanf("%-2c");
 		mixed value;
 		switch (type) {
@@ -144,11 +144,59 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", type, pos, (array)((string)buf)[..16], path, last_string);
 				exit(1);
 		}
+		id_sequence += ({id});
 		map[id] = value;
 	}
 	if (sizeof(map) && sizeof(arr)) werror("WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
 	//werror("< Exiting %s\n", path);
 	return sizeof(arr) ? arr : map;
+}
+
+array list_keys(Stdio.Buffer buf) {
+	array keys = ({ });
+	while (1) {
+		buf->sscanf("%*[ \t\r\n]");
+		if (!sizeof(buf)) break;
+		//The key might be followed by an equals sign and then a value, or it might be followed
+		//by whitespace (eg in an array), or at the end of an array, a close brace. I'm pretty
+		//sure it'll always be one of those. However, we might - in an array - have a quoted
+		//string, which will show up as an empty key and a terminator of '"', or an object.
+		[string key, int terminator] = buf->sscanf("%[^ \t\r\n=}\"{]%c");
+		if (key == "" && terminator == '"') {
+			//String literal, presumably in an array.
+			//No backslash handling here, for simplicity. If it comes up, deal with it.
+			buf->sscanf("%[^\"]\"");
+			continue;
+		}
+		if (key != "") keys += ({key});
+		buf->sscanf("%*[ \t\r\n]"); //Ignore whitespace, if any
+		if (terminator == '}') ; //Currently we don't actually fully parse, we just find keys
+		if (terminator == '=') {
+			//We have an equals sign, so we have a value.
+			if (array str = buf->sscanf("\"%[^\"]\"")) {
+				//String literal. Backslash/quote handling lifted from EU4 parser - it's probably the same.
+				string lit = str[0];
+				while (lit != "" && lit[-1] == '\\') {
+					str = buf->sscanf("%[^\"]\"");
+					if (!str) break; //Should possibly be a parse error?
+					lit += "\"" + str[0];
+				}
+				continue;
+			}
+			if (buf->sscanf("%1[-0-9.A-Za-z_]")) {
+				//If we have a word character or digit, read up to the next whitespace,
+				//assuming that there will always be some.
+				buf->sscanf("%[^ \r\n]");
+				continue;
+			}
+			string ch = buf->read(1);
+			if (ch == "{") ; //Increment nesting level. Not implemented. We could recursively read a map/array here.
+			else if (ch == "}") error("Bad format, got =}, at pos %d\n", sizeof(buf));
+			else error("Unknown, please debug ==> %O\n", ch);
+		}
+		//Otherwise, it's probably an array entry.
+	}
+	return keys;
 }
 
 int main() {
@@ -167,4 +215,11 @@ int main() {
 	mapping toplevel = read_maparray(buf, "base");
 	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
 	werror("Toplevel: %O\n", indices(toplevel));
+	//If we have a matching text save, try to match the keys.
+	data = Stdio.read_file(path + "/SP_SPA_1464_05_18_73fb9c8e-b90c-4a4a-88ea-01304061fa99.eu5");
+	buf = Stdio.Buffer(data); buf->read_only();
+	buf->sscanf("%s\n");
+	array string_sequence = list_keys(buf);
+	werror("Got %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
+	write("%O\n", string_sequence);
 }
