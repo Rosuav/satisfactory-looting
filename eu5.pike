@@ -52,7 +52,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	//werror("> [%d] Entering %s\n", startpos, path);
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		//if (pos == 173054894) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..64]);
+		//if (pos == 173054936) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..64]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
 		if (id == 0) {/*write("NULL entry at %d\n", pos);*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
@@ -105,7 +105,13 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		[int marker] = buf->sscanf("%-2c");
 		//If the key is not followed by 01 00, it's an array entry; so far only seen with ID 20.
 		//When that happens, the next entry follows immediately, so put back the bytes just read.
-		if (marker != 1) {buf->unread(2); arr += ({id}); id_sequence += ({id}); continue;}
+		if (marker != 1) {
+			buf->unread(2);
+			arr += ({id});
+			id_sequence += ({id});
+			//werror("| Recording value %s\n", id);
+			continue;
+		}
 		[int type] = buf->sscanf("%-2c");
 		mixed value;
 		switch (type) {
@@ -139,15 +145,20 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x0165: value = "none"; break;
 			case 0x355d: value = "law"; break;
 			case 0x355e: value = "policy"; break;
-			case 0x000e: value = "yes"; break; //Possibly should use Val.true here
+			case 0x000e:
+				werror("\e[1;34mGOT BOOLEAN\e[0m NEXT%{ %02x%}\n", (array)(string)buf[..16]);
+				//Possibly should use Val.true and Val.false here?
+				value = buf->read(1)[0] ? "yes" : "no";
+				break;
 			default:
 				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", type, pos, (array)((string)buf)[..16], path, last_string);
 				exit(1);
 		}
 		id_sequence += ({id});
 		map[id] = value;
+		//werror("| Recording key %s\n", id);
 	}
-	if (sizeof(map) && sizeof(arr)) werror("WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
+	if (sizeof(map) && sizeof(arr)) exit(1, "WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
 	//werror("< Exiting %s\n", path);
 	return sizeof(arr) ? arr : map;
 }
@@ -215,6 +226,7 @@ int main() {
 	mapping toplevel = read_maparray(buf, "base");
 	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
 	werror("Toplevel: %O\n", indices(toplevel));
+	exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
 	data = Stdio.read_file(path + "/SP_SPA_1464_05_18_73fb9c8e-b90c-4a4a-88ea-01304061fa99.eu5");
 	buf = Stdio.Buffer(data); buf->read_only();
