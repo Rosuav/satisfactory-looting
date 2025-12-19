@@ -49,13 +49,14 @@ array(int) id_sequence = ({ });
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
-	//if (has_value(path, "466")) werror("> [%d] Entering %s\n", startpos, path);
+	int trace = has_value(path, "#31df");
+	if (trace) werror("> [%d] Entering %s\n", startpos, path);
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		//if (startpos == 154105239) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
+		if (startpos == 32757404) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
-		if (id == 0) {write("\e[1;31mNULL entry\e[0m at %d\n", pos); continue;} //Probable misparse of a previous entry
+		if (id == 0) {write("[%d] \e[1;31mNULL entry\e[0m at %d\n", startpos, pos); continue;} //Probable misparse of a previous entry
 		//ID 3 only makes sense for arrays; while parsing, report the path more usefully.
 		if (id == 3) {arr += ({read_maparray(buf, path + "[]")}); continue;}
 		if (id == 0x4b50) {
@@ -99,7 +100,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		else if (id == 0x0167) [id] = buf->sscanf("%-8c"); //Should (always? sometimes?) be interpreted as fixed-point five decimals
 		else {
 			if (!id_to_string[id]) {
-				werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
+				//werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
 				id_to_string[id] = sprintf("#%04x", id);
 			}
 			id = id_to_string[id];
@@ -111,7 +112,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			buf->unread(2);
 			arr += ({id});
 			id_sequence += ({id});
-			//werror("| Recording value %s\n", id);
+			if (trace == 2) werror("| Recording value %s\n", id);
 			continue;
 		}
 		id = (string)id; //In case we save this as JSON later
@@ -148,6 +149,8 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x02d2: value = "value"; break;
 			case 0x0500: value = "boolean"; break;
 			case 0x2dd6: value = "cult"; break;
+			case 0x2de4: value = "relg"; break;
+			case 0x2ddc: value = "regn"; break;
 			case 0x2ddf: value = "loc"; break;
 			case 0x2cd6: value = "ctry"; break;
 			case 0x04ff: value = "prov"; break;
@@ -173,7 +176,9 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x3a54: value = "location_ancient"; break;
 			case 0x2817: value = "active"; break;
 			case 0x3132: value = "before"; break;
+			case 0x30e2: value = "available"; break;
 			case 0x30e3: value = "hired"; break;
+			case 0x2e73: value = "construction"; break;
 			case 0x000e:
 				//werror("\e[1;34mGOT BOOLEAN\e[0m NEXT%{ %02x%}\n", (array)(string)buf[..16]);
 				//Possibly should use Val.true and Val.false here?
@@ -185,7 +190,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		}
 		id_sequence += ({id});
 		map[id] = value;
-		//werror("| Recording key %s\n", id);
+		if (trace == 2) werror("| Recording key %s\n", id);
 	}
 	if (sizeof(map) && sizeof(arr)) {
 		//werror("WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
@@ -194,7 +199,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		//({ 996, ({ "995", "positive" }) }) in the output. Yes, this is lossy.
 		arr += (array)map;
 	}
-	//werror("< Exiting %s\n", path);
+	if (trace) werror("< Exiting %s\n", path);
 	return sizeof(arr) ? arr : map;
 }
 
