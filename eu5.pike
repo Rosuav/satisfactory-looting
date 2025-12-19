@@ -52,7 +52,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	//if (has_value(path, "466")) werror("> [%d] Entering %s\n", startpos, path);
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		//if (startpos == 172693393) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
+		//if (startpos == 154105239) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
 		if (id == 0) {write("\e[1;31mNULL entry\e[0m at %d\n", pos); continue;} //Probable misparse of a previous entry
@@ -80,14 +80,16 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			buf = Stdio.Buffer(files->string_lookup); buf->read_only();
 			[int unk1, int count, int unk3] = buf->sscanf("%c%-2c%-2c");
 			while (sizeof(buf)) string_lookup += buf->sscanf("%-2H");
+			//Stdio.File str = Stdio.File("string_lookup", "wct"); foreach (string_lookup; int i; string s) str->write("%04x: %s\n", i, s);
 			//Sweet. Now we can switch out to the compressed game state.
 			buf = Stdio.Buffer(files->gamestate); buf->read_only();
 			werror("Switching to compressed gamestate, %d bytes.\n", sizeof(buf));
 			id_sequence = ({ });
 			continue;
 		}
-		//If the ID is 0d3e, check string_lookup. TODO: Probably also if it's 0d40?
+		//If the ID is 0d3e or 0d40, check string_lookup.
 		if (id == 0x0d3e) id = last_string = string_lookup[buf->read_le_int(2)];
+		else if (id == 0x0d40) id = last_string = string_lookup[buf->read_le_int(1)];
 		//If the ID is 0017, it's an immediate string. I have NO idea why "resolution_manager"
 		//is stored immediate where all the others are by their IDs.
 		else if (id == 0x0017) [id] = buf->sscanf("%-2H");
