@@ -49,16 +49,14 @@ array(int) id_sequence = ({ });
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
-	//werror("> [%d] Entering %s\n", startpos, path);
+	//if (has_value(path, "466")) werror("> [%d] Entering %s\n", startpos, path);
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		//if (pos == 173054936) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..64]);
+		//if (startpos == 172693393) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
-		if (id == 0) {/*write("NULL entry at %d\n", pos);*/ continue;} //Do these always come in pairs? If so, it might be that it brings with it another pair of null bytes.
-		//IDs 3, 12, and 15 have only ever been used for arrays. Unlike ID 20, which is used for both.
-		if (id == 15) {arr += buf->sscanf("%-2H"); id_sequence += ({arr[-1]}); continue;}
-		if (id == 12) {arr += buf->sscanf("%-4c"); id_sequence += ({arr[-1]}); continue;}
+		if (id == 0) {write("\e[1;31mNULL entry\e[0m at %d\n", pos); continue;} //Probable misparse of a previous entry
+		//ID 3 only makes sense for arrays; while parsing, report the path more usefully.
 		if (id == 3) {arr += ({read_maparray(buf, path + "[]")}); continue;}
 		if (id == 0x4b50) {
 			//In a non-debug savefile, everything after the metadata is packaged up as a zip file.
@@ -93,8 +91,10 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		//If the ID is 0017, it's an immediate string. I have NO idea why "resolution_manager"
 		//is stored immediate where all the others are by their IDs.
 		else if (id == 0x0017) [id] = buf->sscanf("%-2H");
-		//If the ID is 0014, the key is a number, not a string. Casting to string so we can save as JSON if desired.
-		else if (id == 0x0014) id = (string)buf->read_le_int(4);
+		else if (id == 0x000f) [id] = buf->sscanf("%-2H"); //What's the difference with id 000f then?
+		else if (id == 0x000c) [id] = buf->sscanf("%-4c");
+		else if (id == 0x0014) [id] = buf->sscanf("%-4c");
+		else if (id == 0x0167) [id] = buf->sscanf("%-8c"); //Should (always? sometimes?) be interpreted as fixed-point five decimals
 		else {
 			if (!id_to_string[id]) {
 				werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
@@ -112,12 +112,15 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			//werror("| Recording value %s\n", id);
 			continue;
 		}
+		id = (string)id; //In case we save this as JSON later
 		[int type] = buf->sscanf("%-2c");
 		mixed value;
 		switch (type) {
 			case 0x0003: value = read_maparray(buf, path + "-" + id); break;
+			case 0x029c: //64-bit integer, used for general-purpose numbers
+				[value] = buf->sscanf("%-8c");
+				break;
 			case 0x000c: //32-bit integer, used for date and version
-			case 0x029c: //32-bit integer, used for general-purpose numbers
 			case 0x0014: //32-bit integer... for something else.
 				//I don't know what the differences between these are. One might be unsigned?
 				//value = buf->read_le_int(4);
@@ -133,32 +136,53 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
 			case 0x0d40: value = last_string = string_lookup[buf->read_int8()]; break;
 			case 0x0d3e: value = last_string = string_lookup[buf->read_le_int(2)]; break;
+			case 0x0243:
+				//RGB color; should always be followed by type 0003 and a subarray.
+				if (buf->read(2) != "\x03\x00") exit(1, "UNKNOWN 0243 at pos %d\n", pos);
+				value = read_maparray(buf, path + "-" + id + ":rgb");
+				break;
 			//This might be an enumeration??
 			case 0x2df2: value = "char"; break;
 			case 0x02d2: value = "value"; break;
 			case 0x0500: value = "boolean"; break;
+			case 0x2dd6: value = "cult"; break;
 			case 0x2ddf: value = "loc"; break;
 			case 0x2cd6: value = "ctry"; break;
+			case 0x04ff: value = "prov"; break;
+			case 0x315c: value = "rebl"; break;
+			case 0x3100: value = "reli"; break;
 			case 0x393e: value = "formable_country"; break;
 			case 0x32e3: value = "international_organization"; break;
 			case 0x2d06: value = "area"; break;
 			case 0x0165: value = "none"; break;
 			case 0x355d: value = "law"; break;
 			case 0x355e: value = "policy"; break;
+			case 0x3130: value = "situation"; break;
+			case 0x3646: value = "disease_outbreak"; break;
+			case 0x2e0b: value = "patronym"; break;
+			case 0x2e0c: value = "descendant"; break;
+			case 0x27f6: value = "location"; break;
+			case 0x3a54: value = "location_ancient"; break;
 			case 0x000e:
-				werror("\e[1;34mGOT BOOLEAN\e[0m NEXT%{ %02x%}\n", (array)(string)buf[..16]);
+				//werror("\e[1;34mGOT BOOLEAN\e[0m NEXT%{ %02x%}\n", (array)(string)buf[..16]);
 				//Possibly should use Val.true and Val.false here?
 				value = buf->read(1)[0] ? "yes" : "no";
 				break;
 			default:
-				werror("UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", type, pos, (array)((string)buf)[..16], path, last_string);
+				werror("[%d] UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", startpos, type, pos, (array)((string)buf)[..16], path, last_string);
 				exit(1);
 		}
 		id_sequence += ({id});
 		map[id] = value;
 		//werror("| Recording key %s\n", id);
 	}
-	if (sizeof(map) && sizeof(arr)) exit(1, "WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
+	if (sizeof(map) && sizeof(arr)) {
+		//werror("WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
+		//For now, stick the two parts together; array first, then mapping entries as pairs
+		//So an array of "{ 996 995=positive }" will be represented as the two-element array
+		//({ 996, ({ "995", "positive" }) }) in the output. Yes, this is lossy.
+		arr += (array)map;
+	}
 	//werror("< Exiting %s\n", path);
 	return sizeof(arr) ? arr : map;
 }
