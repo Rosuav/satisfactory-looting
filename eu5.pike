@@ -163,8 +163,17 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x3646: value = "disease_outbreak"; break;
 			case 0x2e0b: value = "patronym"; break;
 			case 0x2e0c: value = "descendant"; break;
+			case 0x2e90: value = "estate"; break;
 			case 0x27f6: value = "location"; break;
+			case 0x27f7: value = "unit"; break;
+			case 0x27d2: value = "province"; break;
+			case 0x2e4f: value = "gathering"; break;
+			case 0x2d4a: value = "navy"; break;
+			case 0x2d4f: value = "combat"; break;
 			case 0x3a54: value = "location_ancient"; break;
+			case 0x2817: value = "active"; break;
+			case 0x3132: value = "before"; break;
+			case 0x30e3: value = "hired"; break;
 			case 0x000e:
 				//werror("\e[1;34mGOT BOOLEAN\e[0m NEXT%{ %02x%}\n", (array)(string)buf[..16]);
 				//Possibly should use Val.true and Val.false here?
