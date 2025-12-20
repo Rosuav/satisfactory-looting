@@ -306,14 +306,15 @@ int main() {
 		else if (id[0] == '#') {
 			//We have an incomparable. If we were previously synchronized, that's
 			//great! But if we weren't, then we still don't know anything.
-			if (mode == MODE_SYNC) mode = MODE_CANDIDATE;
+			if (mode == MODE_SYNC) {candidates = ({ }); mode = MODE_CANDIDATE;}
 			if (mode == MODE_CANDIDATESYNC) {
+				write("Adding a block! %d-%d-%d\n", sizeof(prevmatches), sizeof(candidates), sizeof(matches));
 				//After a synchronization point, we find more candidates. That's
 				//good; we can report the previous ones and carry on.
 				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates])});
 				//When we go from a sync straight back into another candidate, the matches can be reused.
 				prevmatches = matches;
-				matches = ({ });
+				candidates = matches = ({ });
 				mode = MODE_CANDIDATE;
 			}
 			candidates += ({({id, str})});
@@ -322,6 +323,7 @@ int main() {
 			//We have a mismatch.
 			if (mode == MODE_CANDIDATESYNC) {
 				//Desynchronization after candidates and synchronization. Save the current block.
+				write("Adding a block! %d-%d-%d\n", sizeof(prevmatches), sizeof(candidates), sizeof(matches));
 				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates])});
 				prevmatches = matches = ({ });
 			}
@@ -332,7 +334,7 @@ int main() {
 			//Pretty simple algorithm here; this isn't always going to find the best diff but it's probably fine.
 			mapping idskip = ([]), strskip = ([]);
 			//First iteration of this loop looks at the same id/str as we already have, then we advance from there.
-			write("DESYNC: [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
+			//write("DESYNC: [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 			for (int skip = 0; nextid + skip < sizeof(id_sequence) && nextstr + skip < sizeof(string_sequence); ++skip) {
 				id = id_sequence[nextid + skip]; str = string_sequence[nextstr + skip];
 				//When skip is (say) 4, we've scanned 4 entries forward in each array.
@@ -346,7 +348,7 @@ int main() {
 				idskip[id] = strskip[str] = skip;
 			}
 			id = id_sequence[nextid]; str = string_sequence[nextstr];
-			write("RESYNC: Resuming [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
+			//write("RESYNC: Resuming [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 			prevmatches = matches = ({ });
 			mode = MODE_SYNC;
 		}
