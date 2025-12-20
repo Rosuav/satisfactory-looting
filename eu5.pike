@@ -308,7 +308,6 @@ int main() {
 			//great! But if we weren't, then we still don't know anything.
 			if (mode == MODE_SYNC) {candidates = ({ }); mode = MODE_CANDIDATE;}
 			if (mode == MODE_CANDIDATESYNC) {
-				write("Adding a block! %d-%d-%d\n", sizeof(prevmatches), sizeof(candidates), sizeof(matches));
 				//After a synchronization point, we find more candidates. That's
 				//good; we can report the previous ones and carry on.
 				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates])});
@@ -323,7 +322,6 @@ int main() {
 			//We have a mismatch.
 			if (mode == MODE_CANDIDATESYNC) {
 				//Desynchronization after candidates and synchronization. Save the current block.
-				write("Adding a block! %d-%d-%d\n", sizeof(prevmatches), sizeof(candidates), sizeof(matches));
 				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates])});
 				prevmatches = matches = ({ });
 			}
@@ -356,6 +354,9 @@ int main() {
 	werror("Got %d candidacy blocks.\n", sizeof(blocks));
 	foreach (blocks, mapping blk) {
 		write("- %d candidates at quality %d-%d\n", sizeof(blk->candidates), sizeof(blk->prematches), sizeof(blk->postmatches));
+		foreach (blk->prematches, string match) write("%30s | %<s\n", match);
+		foreach (blk->candidates, [string id, string str]) write("\e[1m%30s | %s\e[0m\n", id, str);
+		foreach (blk->postmatches, string match) write("%30s | %<s\n", match);
 	}
 	Stdio.write_file("candidates.txt", sprintf("%O\n", blocks));
 }
