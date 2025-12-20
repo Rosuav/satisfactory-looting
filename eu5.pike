@@ -79,7 +79,7 @@ mapping(int:string) id_to_string = ([
 
 array string_lookup = ({ });
 string last_string = "?";
-array(int) id_sequence = ({ });
+array(string) id_sequence = ({ });
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
@@ -232,6 +232,7 @@ array list_strings(Stdio.Buffer buf) {
 }
 
 int main() {
+	#if 0
 	string path = "/mnt/sata-ssd/.steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
 	string data = Stdio.read_file(path + "/autosave_73fb9c8e-b90c-4a4a-88ea-01304061fa99.eu5");
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
@@ -256,6 +257,12 @@ int main() {
 	werror("Got %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
 	//Stdio.write_file("idseq.txt", sprintf("%O\n", id_sequence));
 	//Stdio.write_file("strseq.txt", sprintf("%O\n", string_sequence));
+	Stdio.write_file("allstrings.json", Standards.JSON.encode(({id_sequence, string_sequence})));
+	return 0;
+	#else
+	[id_sequence, array string_sequence] = Standards.JSON.decode(Stdio.read_file("allstrings.json"));
+	write("Loaded %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
+	#endif
 
 	//Attempt to diff the two arrays.
 	//In the id sequence, anything beginning with a hash (eg "#3206") is incomparable.
@@ -276,4 +283,61 @@ int main() {
 	//multiple synchronization pairs before and after any candidates; these are described
 	//as the candidacy quality, given as a pair of numbers (eg "2-1" if the country->1
 	//sequence were the entire file).
+	int nextid = 0, nextstr = 0;
+	enum {MODE_SYNC, MODE_CANDIDATE, MODE_CANDIDATESYNC};
+	int mode = MODE_SYNC;
+	array blocks = ({ }), matches = ({ }), prevmatches = ({ }), candidates = ({ });
+	while (nextid < sizeof(id_sequence) && nextstr < sizeof(string_sequence)) {
+		string id = id_sequence[nextid], str = string_sequence[nextstr];
+		write("Compare [%d] %O to [%d] %O\n", nextid, id, nextstr, str);
+		if (id == str) {
+			//We have a match!
+			if (mode == MODE_CANDIDATE) mode = MODE_CANDIDATESYNC;
+			++nextid; ++nextstr;
+			matches += ({id}); //same as str
+		}
+		else if (id[0] == '#') {
+			//We have an incomparable. If we were previously synchronized, that's
+			//great! But if we weren't, then we still don't know anything.
+			if (mode == MODE_SYNC) mode = MODE_CANDIDATE;
+			if (mode == MODE_CANDIDATESYNC) {
+				//After a synchronization point, we find more candidates. That's
+				//good; we can report the previous ones and carry on.
+				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates])});
+				//When we go from a sync straight back into another candidate, the matches can be reused.
+				prevmatches = matches;
+				matches = ({ });
+				mode = MODE_CANDIDATE;
+			}
+			candidates += ({({id, str})});
+			++nextid; ++nextstr;
+		} else {
+			//We have a mismatch.
+			if (mode == MODE_CANDIDATESYNC) {
+				//Desynchronization after candidates and synchronization. Save the current block.
+				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates])});
+				prevmatches = matches = ({ });
+			}
+			if (mode == MODE_CANDIDATE) {
+				//Failed candidacy. Report?
+			}
+			//So. We need to scan forward in both arrays until we find a resync.
+			//Pretty simple algorithm here; this isn't always going to find the best diff but it's probably fine.
+			mapping idskip = ([]), strskip = ([]);
+			//First iteration of this loop looks at the same id/str as we already have, then we advance from there.
+			for (int skip = 0; nextid + skip < sizeof(id_sequence) && nextstr + skip < sizeof(string_sequence); ++skip) {
+				id = id_sequence[nextid]; str = string_sequence[nextstr];
+				if (!undefinedp(idskip[str])) {nextid += idskip[str]; nextstr += skip; break;}
+				if (!undefinedp(strskip[id])) {nextstr += strskip[id]; nextid += skip; break;}
+				idskip[id] = strskip[str] = skip;
+			}
+			prevmatches = matches = ({ });
+			mode = MODE_SYNC;
+		}
+	}
+	werror("Got %d candidacy blocks.\n", sizeof(blocks));
+	foreach (blocks, mapping blk) {
+		write("- %d candidates at quality %d-%d\n", sizeof(blk->candidates), sizeof(blk->prematches), sizeof(blk->postmatches));
+	}
+	Stdio.write_file("candidates.txt", sprintf("%O\n", blocks));
 }
