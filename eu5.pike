@@ -41,6 +41,40 @@ mapping(int:string) id_to_string = ([
  	0x347d: "engine_code_info",
  	0x35c3: "code_commit",
 	0x3bb5: "player_country_name",
+	0x2df2: "char",
+	0x02d2: "value",
+	0x0500: "boolean",
+	0x2dd6: "cult",
+	0x2de4: "relg",
+	0x2ddc: "regn",
+	0x2ddf: "loc",
+	0x2cd6: "ctry",
+	0x04ff: "prov",
+	0x315c: "rebl",
+	0x3100: "reli",
+	0x393e: "formable_country",
+	0x32e3: "international_organization",
+	0x2d06: "area",
+	0x0165: "none",
+	0x355d: "law",
+	0x355e: "policy",
+	0x3130: "situation",
+	0x3646: "disease_outbreak",
+	0x2e0b: "patronym",
+	0x2e0c: "descendant",
+	0x2e90: "estate",
+	0x27f6: "location",
+	0x27f7: "unit",
+	0x27d2: "province",
+	0x2e4f: "gathering",
+	0x2d4a: "navy",
+	0x2d4f: "combat",
+	0x3a54: "location_ancient",
+	0x2817: "active",
+	0x3132: "before",
+	0x30e2: "available",
+	0x30e3: "hired",
+	0x2e73: "construction",
 ]);
 
 array string_lookup = ({ });
@@ -51,19 +85,37 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	int startpos = sizeof(buf);
 	int trace = has_value(path, "#31df");
 	if (trace) werror("> [%d] Entering %s\n", startpos, path);
+	enum {
+		MODE_EMPTY, //No object seen yet (or the last one seen was the value of a key/value pair).
+		MODE_GOTOBJ, //Got an object. It might be an array entry and it might be the key in a key/value pair.
+		MODE_GOTKEY, //Got an object and it is definitely the key.
+	};
+	int mode = MODE_EMPTY;
+	mixed lastobj; //Relevant in GOTOBJ and GOTKEY modes.
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		if (startpos == 32757404) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
+		if (pos == 32757410) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
 		if (id == 0) {write("[%d] \e[1;31mNULL entry\e[0m at %d\n", startpos, pos); continue;} //Probable misparse of a previous entry
-		//ID 3 only makes sense for arrays; while parsing, report the path more usefully.
-		if (id == 3) {arr += ({read_maparray(buf, path + "[]")}); continue;}
+		if (id == 1) {
+			if (mode != MODE_GOTOBJ) {write("[%d] \e[1;31mGOT 01 00 WITHOUT KEY\e[0m at %d\n", startpos, pos); continue;} //Probable misparse
+			mode = MODE_GOTKEY;
+			continue;
+		}
+		//If we get two objects in a row, without 01 00 between, then the first one was an array entry.
+		if (mode == MODE_GOTOBJ) {
+			arr += ({lastobj});
+			mode = MODE_EMPTY;
+			if (trace == 2) werror("| Recording key %s\n", id);
+		}
 		if (id == 0x4b50) {
 			//In a non-debug savefile, everything after the metadata is packaged up as a zip file.
 			//It can be recognized by the "PK" signature (50 4b), which is then followed by 03 04.
 			//Pike comes with a Filesystem.Zip interface but it's not really optimized for this
 			//sort of job, so instead we do our own parsing.
+			//(It may be easier, instead, to start at the end of central directory, and not parse
+			//the initial uncompressed header. All the content seems to be replicated anyway.)
 			if (buf->read(2) != "\3\4") werror("WARNING: MALFORMED ZIP ARCHIVE\n");
 			mapping files = ([]);
 			while (sizeof(buf)) {
@@ -88,38 +140,12 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			id_sequence = ({ });
 			continue;
 		}
-		//If the ID is 0d3e or 0d40, check string_lookup.
-		if (id == 0x0d3e) id = last_string = string_lookup[buf->read_le_int(2)];
-		else if (id == 0x0d40) id = last_string = string_lookup[buf->read_le_int(1)];
-		//If the ID is 0017, it's an immediate string. I have NO idea why "resolution_manager"
-		//is stored immediate where all the others are by their IDs.
-		else if (id == 0x0017) [id] = buf->sscanf("%-2H");
-		else if (id == 0x000f) [id] = buf->sscanf("%-2H"); //What's the difference with id 000f then?
-		else if (id == 0x000c) [id] = buf->sscanf("%-4c");
-		else if (id == 0x0014) [id] = buf->sscanf("%-4c");
-		else if (id == 0x0167) [id] = buf->sscanf("%-8c"); //Should (always? sometimes?) be interpreted as fixed-point five decimals
-		else {
-			if (!id_to_string[id]) {
-				//werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
-				id_to_string[id] = sprintf("#%04x", id);
-			}
-			id = id_to_string[id];
-		}
-		[int marker] = buf->sscanf("%-2c");
-		//If the key is not followed by 01 00, it's an array entry; so far only seen with ID 20.
-		//When that happens, the next entry follows immediately, so put back the bytes just read.
-		if (marker != 1) {
-			buf->unread(2);
-			arr += ({id});
-			id_sequence += ({id});
-			if (trace == 2) werror("| Recording value %s\n", id);
-			continue;
-		}
-		id = (string)id; //In case we save this as JSON later
-		[int type] = buf->sscanf("%-2c");
 		mixed value;
-		switch (type) {
-			case 0x0003: value = read_maparray(buf, path + "-" + id); break;
+		switch (id) {
+			case 0x0003:
+				//FIXME: Adding the ID here will just always give 3
+				value = read_maparray(buf, path + "-" + id);
+				break;
 			case 0x029c: //64-bit integer, used for general-purpose numbers
 				[value] = buf->sscanf("%-8c");
 				break;
@@ -129,6 +155,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				//value = buf->read_le_int(4);
 				[value] = buf->sscanf("%-4c");
 				break;
+			case 0x0017: //What's the difference between these two?
 			case 0x000f: [value] = buf->sscanf("%-2H"); break;
 			case 0x0167:
 				//This is shown in the text version as a float.
@@ -144,53 +171,27 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				if (buf->read(2) != "\x03\x00") exit(1, "UNKNOWN 0243 at pos %d\n", pos);
 				value = read_maparray(buf, path + "-" + id + ":rgb");
 				break;
-			//This might be an enumeration??
-			case 0x2df2: value = "char"; break;
-			case 0x02d2: value = "value"; break;
-			case 0x0500: value = "boolean"; break;
-			case 0x2dd6: value = "cult"; break;
-			case 0x2de4: value = "relg"; break;
-			case 0x2ddc: value = "regn"; break;
-			case 0x2ddf: value = "loc"; break;
-			case 0x2cd6: value = "ctry"; break;
-			case 0x04ff: value = "prov"; break;
-			case 0x315c: value = "rebl"; break;
-			case 0x3100: value = "reli"; break;
-			case 0x393e: value = "formable_country"; break;
-			case 0x32e3: value = "international_organization"; break;
-			case 0x2d06: value = "area"; break;
-			case 0x0165: value = "none"; break;
-			case 0x355d: value = "law"; break;
-			case 0x355e: value = "policy"; break;
-			case 0x3130: value = "situation"; break;
-			case 0x3646: value = "disease_outbreak"; break;
-			case 0x2e0b: value = "patronym"; break;
-			case 0x2e0c: value = "descendant"; break;
-			case 0x2e90: value = "estate"; break;
-			case 0x27f6: value = "location"; break;
-			case 0x27f7: value = "unit"; break;
-			case 0x27d2: value = "province"; break;
-			case 0x2e4f: value = "gathering"; break;
-			case 0x2d4a: value = "navy"; break;
-			case 0x2d4f: value = "combat"; break;
-			case 0x3a54: value = "location_ancient"; break;
-			case 0x2817: value = "active"; break;
-			case 0x3132: value = "before"; break;
-			case 0x30e2: value = "available"; break;
-			case 0x30e3: value = "hired"; break;
-			case 0x2e73: value = "construction"; break;
 			case 0x000e:
 				//werror("\e[1;34mGOT BOOLEAN\e[0m NEXT%{ %02x%}\n", (array)(string)buf[..16]);
 				//Possibly should use Val.true and Val.false here?
 				value = buf->read(1)[0] ? "yes" : "no";
 				break;
 			default:
-				werror("[%d] UNKNOWN DATA TYPE %04x at pos %d:%{ %02x%}\nPath %s, last string %s\n", startpos, type, pos, (array)((string)buf)[..16], path, last_string);
-				exit(1);
+				//If misparses happen, start reporting unknowns, as they may actually require additional
+				//data bytes.
+				if (!id_to_string[id]) {
+					//werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
+					id_to_string[id] = sprintf("#%04x", id);
+				}
+				value = id_to_string[id];
 		}
-		id_sequence += ({id});
-		map[id] = value;
-		if (trace == 2) werror("| Recording key %s\n", id);
+		if (stringp(value) || intp(value)) id_sequence += ({(string)value});
+		if (mode == MODE_EMPTY) {lastobj = value; mode = MODE_GOTOBJ;}
+		else {
+			map[lastobj] = value;
+			mode = MODE_EMPTY;
+			if (trace == 2) werror("| Recording key %s\n", id);
+		}
 	}
 	if (sizeof(map) && sizeof(arr)) {
 		//werror("WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
