@@ -254,6 +254,26 @@ int main() {
 	buf->sscanf("%s\n");
 	array string_sequence = list_strings(buf);
 	werror("Got %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
-	Stdio.write_file("idseq.txt", sprintf("%O\n", id_sequence));
-	Stdio.write_file("strseq.txt", sprintf("%O\n", string_sequence));
+	//Stdio.write_file("idseq.txt", sprintf("%O\n", id_sequence));
+	//Stdio.write_file("strseq.txt", sprintf("%O\n", string_sequence));
+
+	//Attempt to diff the two arrays.
+	//In the id sequence, anything beginning with a hash (eg "#3206") is incomparable.
+	//What we ideally want to see is something like:
+	//	ID		String		Meaning
+	//	"country"	"country"	Synchronized
+	//	"1183"		"1183"		Synchronized
+	//	"#2cf1"		"road_network"	Candidate!
+	//	"#3802"		"roads"		Candidate!
+	//	"#0528"		"from"		Candidate!
+	//	"1"		"1"		Resync!
+	//What we DON'T want to see is two strings that aren't the same. Example:
+	//	ID		String		Meaning
+	//	"save_label"	"save_label"	Synchronized
+	//	"Autosave"	"1464.5.18.16"	DESYNC
+	//	"version"	"version"	Resync
+	//This immediately calls into question everything around it. Ideally, we should see
+	//multiple synchronization pairs before and after any candidates; these are described
+	//as the candidacy quality, given as a pair of numbers (eg "2-1" if the country->1
+	//sequence were the entire file).
 }
