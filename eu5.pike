@@ -310,7 +310,7 @@ int main() {
 			if (mode == MODE_CANDIDATESYNC) {
 				//After a synchronization point, we find more candidates. That's
 				//good; we can report the previous ones and carry on.
-				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates])});
+				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates, "resync": 1])});
 				//When we go from a sync straight back into another candidate, the matches can be reused.
 				prevmatches = matches;
 				candidates = matches = ({ });
@@ -354,7 +354,7 @@ int main() {
 	werror("Got %d candidacy blocks.\n", sizeof(blocks));
 	foreach (blocks, mapping blk) {
 		write("- %d candidates at quality %d-%d\n", sizeof(blk->candidates), sizeof(blk->prematches), sizeof(blk->postmatches));
-		foreach (blk->prematches, string match) write("%30s | %<s\n", match);
+		if (!blk->resync) foreach (blk->prematches, string match) write("%30s | %<s\n", match);
 		foreach (blk->candidates, [string id, string str]) write("\e[1m%30s | %s\e[0m\n", id, str);
 		foreach (blk->postmatches, string match) write("%30s | %<s\n", match);
 	}
