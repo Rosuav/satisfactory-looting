@@ -221,8 +221,15 @@ array list_strings(Stdio.Buffer buf) {
 		}
 		else if (array word = buf->sscanf("%[-0-9.A-Za-z_']")) {
 			//Atom characters - are there any others?
-			//TODO: For best results, transform "123.456" into "12345600" to match the fixed-place handling in binary
-			strings += word;
+			//For best results, transform "123.456" into "12345600" to match the fixed-place handling in binary
+			if (sscanf(word[0], "%d.%[0-9]%s", int before, string after, string tail) && tail == "") {
+				if (sizeof(after) != 5) after = (after + "00000")[..4];
+				string value = (string)before + after;
+				//If the value is less than one (eg 0.0123), we'll build a string like "001230". But
+				//in the binary file, it'll just be stored as 1230, and become "1230".
+				strings += ({(string)(int)value});
+			}
+			else strings += word;
 		} else {
 			string chr = buf->read(1);
 			if (!has_value("={}", chr)) werror("WARNING: Unexpected character %O\nLatest strings: %O\n", chr, strings[<3..]);
@@ -289,7 +296,7 @@ int main() {
 	array blocks = ({ }), matches = ({ }), prevmatches = ({ }), candidates = ({ });
 	while (nextid < sizeof(id_sequence) && nextstr < sizeof(string_sequence)) {
 		string id = id_sequence[nextid], str = string_sequence[nextstr];
-		write("Compare [%d] %O to [%d] %O\n", nextid, id, nextstr, str);
+		//write("Compare [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 		if (id == str) {
 			//We have a match!
 			if (mode == MODE_CANDIDATE) mode = MODE_CANDIDATESYNC;
@@ -325,12 +332,21 @@ int main() {
 			//Pretty simple algorithm here; this isn't always going to find the best diff but it's probably fine.
 			mapping idskip = ([]), strskip = ([]);
 			//First iteration of this loop looks at the same id/str as we already have, then we advance from there.
+			write("DESYNC: [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 			for (int skip = 0; nextid + skip < sizeof(id_sequence) && nextstr + skip < sizeof(string_sequence); ++skip) {
-				id = id_sequence[nextid]; str = string_sequence[nextstr];
+				id = id_sequence[nextid + skip]; str = string_sequence[nextstr + skip];
+				//When skip is (say) 4, we've scanned 4 entries forward in each array.
+				//If there are matching entries in the two arrays within that distance, we take
+				//that and resume. Note that, as written here, we will try to keep the skip
+				//distances similar, rather than taking the earliest match. Ideally, we'd find
+				//multi-string matches, rather than accepting the first coincidence we meet.
+				if (id == str) {nextid += skip; nextstr += skip; break;}
 				if (!undefinedp(idskip[str])) {nextid += idskip[str]; nextstr += skip; break;}
 				if (!undefinedp(strskip[id])) {nextstr += strskip[id]; nextid += skip; break;}
 				idskip[id] = strskip[str] = skip;
 			}
+			id = id_sequence[nextid]; str = string_sequence[nextstr];
+			write("RESYNC: Resuming [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 			prevmatches = matches = ({ });
 			mode = MODE_SYNC;
 		}
