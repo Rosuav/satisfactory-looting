@@ -94,7 +94,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mixed lastobj; //Relevant in GOTOBJ and GOTKEY modes.
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		if (pos == 32757410) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
+		//if (pos == 32757410) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
 		if (id == 0) {write("[%d] \e[1;31mNULL entry\e[0m at %d\n", startpos, pos); continue;} //Probable misparse of a previous entry
@@ -204,51 +204,31 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	return sizeof(arr) ? arr : map;
 }
 
-array list_keys(Stdio.Buffer buf) {
-	array keys = ({ });
+array list_strings(Stdio.Buffer buf) {
+	array strings = ({ });
 	while (1) {
 		buf->sscanf("%*[ \t\r\n]");
 		if (!sizeof(buf)) break;
-		//The key might be followed by an equals sign and then a value, or it might be followed
-		//by whitespace (eg in an array), or at the end of an array, a close brace. I'm pretty
-		//sure it'll always be one of those. However, we might - in an array - have a quoted
-		//string, which will show up as an empty key and a terminator of '"', or an object.
-		[string key, int terminator] = buf->sscanf("%[^ \t\r\n=}\"{]%c");
-		if (key == "" && terminator == '"') {
-			//String literal, presumably in an array.
-			//No backslash handling here, for simplicity. If it comes up, deal with it.
-			buf->sscanf("%[^\"]\"");
-			continue;
-		}
-		if (key != "") keys += ({key});
-		buf->sscanf("%*[ \t\r\n]"); //Ignore whitespace, if any
-		if (terminator == '}') ; //Currently we don't actually fully parse, we just find keys
-		if (terminator == '=') {
-			//We have an equals sign, so we have a value.
-			if (array str = buf->sscanf("\"%[^\"]\"")) {
-				//String literal. Backslash/quote handling lifted from EU4 parser - it's probably the same.
-				string lit = str[0];
-				while (lit != "" && lit[-1] == '\\') {
-					str = buf->sscanf("%[^\"]\"");
-					if (!str) break; //Should possibly be a parse error?
-					lit += "\"" + str[0];
-				}
-				continue;
+		if (array str = buf->sscanf("\"%[^\"]\"")) {
+			//String literal. Backslash/quote handling lifted from EU4 parser - it's probably the same.
+			string lit = str[0];
+			while (lit != "" && lit[-1] == '\\') {
+				str = buf->sscanf("%[^\"]\"");
+				if (!str) break; //Should possibly be a parse error?
+				lit += "\"" + str[0];
 			}
-			if (buf->sscanf("%1[-0-9.A-Za-z_]")) {
-				//If we have a word character or digit, read up to the next whitespace,
-				//assuming that there will always be some.
-				buf->sscanf("%[^ \r\n]");
-				continue;
-			}
-			string ch = buf->read(1);
-			if (ch == "{") ; //Increment nesting level. Not implemented. We could recursively read a map/array here.
-			else if (ch == "}") error("Bad format, got =}, at pos %d\n", sizeof(buf));
-			else error("Unknown, please debug ==> %O\n", ch);
+			strings += ({lit});
 		}
-		//Otherwise, it's probably an array entry.
+		else if (array word = buf->sscanf("%[-0-9.A-Za-z_']")) {
+			//Atom characters - are there any others?
+			//TODO: For best results, transform "123.456" into "12345600" to match the fixed-place handling in binary
+			strings += word;
+		} else {
+			string chr = buf->read(1);
+			if (!has_value("={}", chr)) werror("WARNING: Unexpected character %O\nLatest strings: %O\n", chr, strings[<3..]);
+		}
 	}
-	return keys;
+	return strings;
 }
 
 int main() {
@@ -267,12 +247,13 @@ int main() {
 	mapping toplevel = read_maparray(buf, "base");
 	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
 	werror("Toplevel: %O\n", indices(toplevel));
-	exit(0, "Got %d IDs.\n", sizeof(id_sequence));
+	//exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
 	data = Stdio.read_file(path + "/SP_SPA_1464_05_18_73fb9c8e-b90c-4a4a-88ea-01304061fa99.eu5");
 	buf = Stdio.Buffer(data); buf->read_only();
 	buf->sscanf("%s\n");
-	array string_sequence = list_keys(buf);
+	array string_sequence = list_strings(buf);
 	werror("Got %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
-	write("%O\n", string_sequence);
+	Stdio.write_file("idseq.txt", sprintf("%O\n", id_sequence));
+	Stdio.write_file("strseq.txt", sprintf("%O\n", string_sequence));
 }
