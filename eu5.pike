@@ -239,6 +239,8 @@ array list_strings(Stdio.Buffer buf) {
 }
 
 int main() {
+	foreach ((Stdio.read_file("eu5textid.dat") || "") / "\n", string line)
+		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
 	#if 0
 	string path = "/mnt/sata-ssd/.steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
 	string data = Stdio.read_file(path + "/autosave_73fb9c8e-b90c-4a4a-88ea-01304061fa99.eu5");
@@ -262,8 +264,6 @@ int main() {
 	buf->sscanf("%s\n");
 	array string_sequence = list_strings(buf);
 	werror("Got %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
-	//Stdio.write_file("idseq.txt", sprintf("%O\n", id_sequence));
-	//Stdio.write_file("strseq.txt", sprintf("%O\n", string_sequence));
 	Stdio.write_file("allstrings.json", Standards.JSON.encode(({id_sequence, string_sequence})));
 	return 0;
 	#else
@@ -373,12 +373,24 @@ int main() {
 			}
 		}
 	}
-	//Stdio.write_file("candidates.txt", sprintf("%O\n", blocks));
 	array can = ({ }), qual = ({ });
+	array keep = ({ });
+	//Merge in the current string table
+	foreach (id_to_string; int id; string str) {
+		sighted[sprintf("#%04x", id)] = str;
+		quality[sprintf("#%04x", id)] = 1<<30;
+	}
 	foreach (sighted; string id; string str) {
-		can += ({sprintf("%s: [%d] %s\n", id, quality[id], str)});
-		qual += ({-quality[id]});
+		//Good ones get saved automatically
+		if (quality[id] >= 1000) keep += ({({id, str})});
+		else {
+			//Less good ones get saved as candidates.
+			can += ({sprintf("%s: [%d] %s\n", id, quality[id], str)});
+			qual += ({-quality[id]});
+		}
 	}
 	sort(qual, can);
 	Stdio.write_file("candidates.txt", can * "");
+	sort(keep[*][0], keep);
+	Stdio.write_file("eu5textid.dat", sprintf("%{%s %s\n%}", keep));
 }
