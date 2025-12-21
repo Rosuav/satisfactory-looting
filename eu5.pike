@@ -182,6 +182,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				//For now, storing the integer value; the true value is this divided by 100000.0
 				//(note that this is a change from EU4 where fixed point was to be divided by 1000.0).
 				[value] = buf->sscanf("%-8c");
+				if (value >= (1<<63)) value -= 1<<64; //Signed integer. I think they're all signed???
 				//Or maybe store it smaller, but only if it's an integer?
 				if (value % 100000 == 0) value /= 100000;
 				break;
@@ -257,6 +258,9 @@ array list_strings(Stdio.Buffer buf) {
 			else if (sscanf(word[0], "%d.%[0-9]%s", int before, string after, string tail) && tail == "") {
 				if (sizeof(after) != 5) after = (after + "00000")[..4];
 				string value = (string)before + after;
+				//NOTE: For numbers -1<x<0, the leading part will be "-0", which parses as 0.
+				//Reattach the hyphen to correct this.
+				if (word[0][0] == '-' && !before) value = "-" + value;
 				//If the value is less than one (eg 0.0123), we'll build a string like "001230". But
 				//in the binary file, it'll just be stored as 1230, and become "1230".
 				strings += ({(string)(int)value});
@@ -337,7 +341,7 @@ int main() {
 	while (nextid < sizeof(id_sequence) && nextstr < sizeof(string_sequence)) {
 		string id = id_sequence[nextid], str = string_sequence[nextstr];
 		//write("Compare [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
-		werror("%.1f%%...\r", nextid * 100.0 / sizeof(id_sequence));
+		werror("Comparing... %.1f%%...\r", nextid * 100.0 / sizeof(id_sequence));
 		if (id == str || id[0] == '#') {
 			//Could be a match, or a candidate! Hang onto it for future analysis.
 			matches += ({({id, str})});
