@@ -291,48 +291,53 @@ int main() {
 	//as the candidacy quality, given as a pair of numbers (eg "2-1" if the country->1
 	//sequence were the entire file).
 	int nextid = 0, nextstr = 0;
-	enum {MODE_SYNC, MODE_CANDIDATE, MODE_CANDIDATESYNC};
-	int mode = MODE_SYNC;
-	array blocks = ({ }), matches = ({ }), prevmatches = ({ }), candidates = ({ });
+	array blocks = ({ }), matches = ({ });
+	//Elephant in Cairo: Trigger mismatch detection at the very end so that a final block can be detected.
+	id_sequence += ({"id_sequence"}); string_sequence += ({"string_sequence"});
 	while (nextid < sizeof(id_sequence) && nextstr < sizeof(string_sequence)) {
 		string id = id_sequence[nextid], str = string_sequence[nextstr];
 		//write("Compare [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
-		if (id == str) {
-			//We have a match!
-			if (mode == MODE_CANDIDATE) mode = MODE_CANDIDATESYNC;
-			++nextid; ++nextstr;
-			matches += ({id}); //same as str
-		}
-		else if (id[0] == '#') {
-			//We have an incomparable. If we were previously synchronized, that's
-			//great! But if we weren't, then we still don't know anything.
-			if (mode == MODE_SYNC) {candidates = ({ }); mode = MODE_CANDIDATE;}
-			if (mode == MODE_CANDIDATESYNC) {
-				//After a synchronization point, we find more candidates. That's
-				//good; we can report the previous ones and carry on.
-				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates, "resync": 1])});
-				//When we go from a sync straight back into another candidate, the matches can be reused.
-				prevmatches = matches;
-				candidates = matches = ({ });
-				mode = MODE_CANDIDATE;
-			}
-			candidates += ({({id, str})});
+		werror("%.1f%%...\r", nextid * 100.0 / sizeof(id_sequence));
+		if (id == str || id[0] == '#') {
+			//Could be a match, or a candidate! Hang onto it for future analysis.
+			matches += ({({id, str})});
 			++nextid; ++nextstr;
 		} else {
 			//We have a mismatch.
-			if (mode == MODE_CANDIDATESYNC) {
-				//Desynchronization after candidates and synchronization. Save the current block.
-				blocks += ({(["prematches": prevmatches, "postmatches": matches, "candidates": candidates])});
-				prevmatches = matches = ({ });
-			}
-			if (mode == MODE_CANDIDATE) {
-				//Failed candidacy. Report?
+			if (sizeof(matches)) {
+				//Desynchronization after candidates and/or synchronization. Save the current block,
+				//but exclude any candidates on the outside of it - we want something surrounded by
+				//synchronization points.
+				int start = 0;
+				while (start < sizeof(matches) && matches[start][0][0] == '#') ++start;
+				if (start < sizeof(matches)) {
+					//(if it isn't, there weren't any matches, just a series of incomparables between
+					//two desynchronizations)
+					int end = sizeof(matches) - 1; //Inclusive-inclusive indexing since that's how Pike slices
+					while (matches[end][0][0] == '#') --end; //Guaranteed to terminate; there must be at least one synchronization.
+					//So, now that we've trimmed those off... are there any candidates in the middle?
+					int candidates = 0;
+					for (int i = start; i < end - 1; ++i)
+						candidates += (matches[i][0][0] == '#');
+					if (candidates) {
+						//Okay, we have at least one candidate; the quality is the number of sync points
+						//in the block. This isn't perfect, but it's something. Changing the quality
+						//algorithm would change prioritization but that's all.
+						blocks += ({([
+							"quality": end - start + 1 - candidates,
+							"candidates": candidates,
+							"strings": matches[start..end],
+						])});
+					}
+				}
+				matches = ({ });
 			}
 			//So. We need to scan forward in both arrays until we find a resync.
 			//Pretty simple algorithm here; this isn't always going to find the best diff but it's probably fine.
 			mapping idskip = ([]), strskip = ([]);
 			//First iteration of this loop looks at the same id/str as we already have, then we advance from there.
 			//write("DESYNC: [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
+			int found = 0;
 			for (int skip = 0; nextid + skip < sizeof(id_sequence) && nextstr + skip < sizeof(string_sequence); ++skip) {
 				id = id_sequence[nextid + skip]; str = string_sequence[nextstr + skip];
 				//When skip is (say) 4, we've scanned 4 entries forward in each array.
@@ -340,23 +345,40 @@ int main() {
 				//that and resume. Note that, as written here, we will try to keep the skip
 				//distances similar, rather than taking the earliest match. Ideally, we'd find
 				//multi-string matches, rather than accepting the first coincidence we meet.
-				if (id == str) {nextid += skip; nextstr += skip; break;}
-				if (!undefinedp(idskip[str])) {nextid += idskip[str]; nextstr += skip; break;}
-				if (!undefinedp(strskip[id])) {nextstr += strskip[id]; nextid += skip; break;}
+				if (id == str) {nextid += skip; nextstr += skip; found = 1; break;}
+				if (!undefinedp(idskip[str])) {nextid += idskip[str]; nextstr += skip; found = 1; break;}
+				if (!undefinedp(strskip[id])) {nextstr += strskip[id]; nextid += skip; found = 1; break;}
 				idskip[id] = strskip[str] = skip;
 			}
-			id = id_sequence[nextid]; str = string_sequence[nextstr];
-			//write("RESYNC: Resuming [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
-			prevmatches = matches = ({ });
-			mode = MODE_SYNC;
+			/* else: */ if (!found) break; //If no resync point was found, we must have hit the end.
 		}
 	}
 	werror("Got %d candidacy blocks.\n", sizeof(blocks));
+	mapping sighted = ([]), quality = ([]);
 	foreach (blocks, mapping blk) {
-		write("- %d candidates at quality %d-%d\n", sizeof(blk->candidates), sizeof(blk->prematches), sizeof(blk->postmatches));
-		if (!blk->resync) foreach (blk->prematches, string match) write("%30s | %<s\n", match);
-		foreach (blk->candidates, [string id, string str]) write("\e[1m%30s | %s\e[0m\n", id, str);
-		foreach (blk->postmatches, string match) write("%30s | %<s\n", match);
+		//write("- %d candidates at quality %d\n", blk->candidates, blk->quality);
+		multiset seen = (<>);
+		foreach (blk->strings, [string id, string str]) {
+			if (seen[id]) continue;
+			seen[id] = 1;
+			//write("\e[%dm%30s | %s\e[0m\n", id != str, id, str); //If they match, it's a context line, not bold. If they're different, bold it.
+			if (id[0] == '#') {
+				if (sighted[id] && sighted[id] != str) {
+					sighted[id] += " :: " + str;
+					werror("MISMATCH: %O -> %O\n", id, sighted[id]);
+				} else {
+					sighted[id] = str;
+					quality[id] += blk->quality;
+				}
+			}
+		}
 	}
-	Stdio.write_file("candidates.txt", sprintf("%O\n", blocks));
+	//Stdio.write_file("candidates.txt", sprintf("%O\n", blocks));
+	array can = ({ }), qual = ({ });
+	foreach (sighted; string id; string str) {
+		can += ({sprintf("%s: [%d] %s\n", id, quality[id], str)});
+		qual += ({-quality[id]});
+	}
+	sort(qual, can);
+	Stdio.write_file("candidates.txt", can * "");
 }
