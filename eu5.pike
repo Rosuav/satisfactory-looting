@@ -86,6 +86,14 @@ string date_to_string(int date) {
 	return d;
 }
 
+//Appended to in main(), is the number of days to add to get to that month.
+//January is -1 since day values are 1-based but integers are 0-based.
+//And there's a shim because month values are also 1-based (we'll never look up month 0).
+array(int) month_offset = ({0, -1});
+int date_to_int(int y, int m, int d, int h) {
+	return ((y + 5000) * 365 + month_offset[m] + d) * 24 + h;
+}
+
 array string_lookup = ({ });
 string last_string = "?";
 array(string) id_sequence = ({ });
@@ -160,7 +168,9 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				break;
 			case 0x000c: //32-bit integer, used for date and version
 				//Assuming it's a date, for now. How would we know?
-				value = date_to_string(buf->sscanf("%-4c")[0]);
+				//For the purposes of synchronization, it's easier to NOT transform to date,
+				//and instead to transform the text dates into numbers.
+				value = /*date_to_string*/(buf->sscanf("%-4c")[0]);
 				break;
 			case 0x0014: //32-bit integer... for something else.
 				[value] = buf->sscanf("%-4c");
@@ -172,6 +182,8 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				//For now, storing the integer value; the true value is this divided by 100000.0
 				//(note that this is a change from EU4 where fixed point was to be divided by 1000.0).
 				[value] = buf->sscanf("%-8c");
+				//Or maybe store it smaller, but only if it's an integer?
+				if (value % 100000 == 0) value /= 100000;
 				break;
 			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
 			case 0x0d40: value = last_string = string_lookup[buf->read_int8()]; break;
@@ -234,8 +246,15 @@ array list_strings(Stdio.Buffer buf) {
 		}
 		else if (array word = buf->sscanf("%[-0-9.A-Za-z_']")) {
 			//Atom characters - are there any others?
+			//Transform dates back into numbers for better synchronization. I don't know how to
+			//recognize which fields in the binary should be treated as dates, so fold them all
+			//to numbers here.
+			if (sscanf(word[0], "%d.%d.%d.%d%s", int y, int m, int d, int h, string tail) && tail == "")
+				strings += ({(string)date_to_int(y, m, d, h)});
+			else if (sscanf(word[0], "%d.%d.%d%s", int y, int m, int d, string tail) && tail == "")
+				strings += ({(string)date_to_int(y, m, d, 0)});
 			//For best results, transform "123.456" into "12345600" to match the fixed-place handling in binary
-			if (sscanf(word[0], "%d.%[0-9]%s", int before, string after, string tail) && tail == "") {
+			else if (sscanf(word[0], "%d.%[0-9]%s", int before, string after, string tail) && tail == "") {
 				if (sizeof(after) != 5) after = (after + "00000")[..4];
 				string value = (string)before + after;
 				//If the value is less than one (eg 0.0123), we'll build a string like "001230". But
@@ -254,9 +273,11 @@ array list_strings(Stdio.Buffer buf) {
 int main() {
 	//Build up a convenience mapping for date parsing
 	int d = 0;
-	foreach (({31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}); int mon; int len)
+	foreach (({31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}); int mon; int len) {
+		month_offset += ({month_offset[-1] + len});
 		for (int i = 0; i < len; ++i)
 			idx_to_date[d++] = sprintf("%d.%d", mon + 1, i + 1);
+	}
 	//Dates consist of (year * 365 + date value) * 24 + hour, where the date value is basically the Julian day number (ignoring leap years).
 	foreach ((Stdio.read_file("eu5textid.dat") || "") / "\n", string line)
 		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
@@ -313,7 +334,6 @@ int main() {
 	//Elephant in Cairo: Trigger mismatch detection at the very end so that a final block can be detected.
 	id_sequence += ({"id_sequence"}); string_sequence += ({"string_sequence"});
 	int have_candidate = 0;
-	object dates = Stdio.File("dates.txt", "wct");
 	while (nextid < sizeof(id_sequence) && nextstr < sizeof(string_sequence)) {
 		string id = id_sequence[nextid], str = string_sequence[nextstr];
 		//write("Compare [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
@@ -325,8 +345,6 @@ int main() {
 			if (id[0] == '#') have_candidate = 1;
 		} else {
 			//We have a mismatch.
-			if (sscanf(str, "%d.%d.%d.%d%s", int y, int m, int d, int h, string tail) && tail == "") dates->write(sprintf("DATE FIELD: %O vs %d.%d.%d.%d\n", id, y, m, d, h));
-			else if (sscanf(str, "%d.%d.%d%s", int y, int m, int d, string tail) && tail == "") dates->write(sprintf("DATE FIELD: %O vs %d.%d.%d\n", id, y, m, d));
 			if (sizeof(matches)) {
 				//if (have_candidate) foreach (matches, [string i, string s]) write("\e[%dm%30s | %s\e[0m\n", i != s, i, s);
 				//if (have_candidate) exit(0, "Now have %O %O\n", id, str);
