@@ -178,6 +178,9 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x0d3e: value = last_string = string_lookup[buf->read_le_int(2)]; break;
 			case 0x0243:
 				//RGB color; should always be followed by type 0003 and a subarray.
+				//Hack: Since the text file has the letters "rgb" followed by the subarray,
+				//insert that token into the string stream as if we'd found it.
+				id_sequence += ({"rgb"});
 				if (buf->read(2) != "\x03\x00") exit(1, "UNKNOWN 0243 at pos %d\n", pos);
 				value = read_maparray(buf, path + "-" + id + ":rgb");
 				break;
