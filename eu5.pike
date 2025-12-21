@@ -174,6 +174,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				break;
 			case 0x0014: //32-bit integer... for something else.
 				[value] = buf->sscanf("%-4c");
+				if (value > (1<<31)) value -= 1<<32; //Are they all signed?
 				break;
 			case 0x0017: //What's the difference between these two?
 			case 0x000f: [value] = buf->sscanf("%-2H"); break;
