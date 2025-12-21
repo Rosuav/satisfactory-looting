@@ -77,6 +77,15 @@ mapping(int:string) id_to_string = ([
 	0x2e73: "construction",
 ]);
 
+mapping(int:string) idx_to_date = ([]); //Convenience lookup - 0 maps to "1.1" for Jan 1st, 364 maps to "12.31"
+string date_to_string(int date) {
+	int hour = date % 24; date /= 24;
+	int year = date / 365 - 5000; date %= 365;
+	string d = sprintf("%d.%s", year, idx_to_date[date]);
+	if (hour) d += "." + hour;
+	return d;
+}
+
 array string_lookup = ({ });
 string last_string = "?";
 array(string) id_sequence = ({ });
@@ -150,9 +159,10 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				[value] = buf->sscanf("%-8c");
 				break;
 			case 0x000c: //32-bit integer, used for date and version
+				//Assuming it's a date, for now. How would we know?
+				value = date_to_string(buf->sscanf("%-4c")[0]);
+				break;
 			case 0x0014: //32-bit integer... for something else.
-				//I don't know what the differences between these are. One might be unsigned?
-				//value = buf->read_le_int(4);
 				[value] = buf->sscanf("%-4c");
 				break;
 			case 0x0017: //What's the difference between these two?
@@ -239,6 +249,12 @@ array list_strings(Stdio.Buffer buf) {
 }
 
 int main() {
+	//Build up a convenience mapping for date parsing
+	int d = 0;
+	foreach (({31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}); int mon; int len)
+		for (int i = 0; i < len; ++i)
+			idx_to_date[d++] = sprintf("%d.%d", mon + 1, i + 1);
+	//Dates consist of (year * 365 + date value) * 24 + hour, where the date value is basically the Julian day number (ignoring leap years).
 	foreach ((Stdio.read_file("eu5textid.dat") || "") / "\n", string line)
 		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
 	#if 1
@@ -294,6 +310,7 @@ int main() {
 	//Elephant in Cairo: Trigger mismatch detection at the very end so that a final block can be detected.
 	id_sequence += ({"id_sequence"}); string_sequence += ({"string_sequence"});
 	int have_candidate = 0;
+	object dates = Stdio.File("dates.txt", "wct");
 	while (nextid < sizeof(id_sequence) && nextstr < sizeof(string_sequence)) {
 		string id = id_sequence[nextid], str = string_sequence[nextstr];
 		//write("Compare [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
@@ -305,8 +322,11 @@ int main() {
 			if (id[0] == '#') have_candidate = 1;
 		} else {
 			//We have a mismatch.
+			if (sscanf(str, "%d.%d.%d.%d%s", int y, int m, int d, int h, string tail) && tail == "") dates->write(sprintf("DATE FIELD: %O vs %d.%d.%d.%d\n", id, y, m, d, h));
+			else if (sscanf(str, "%d.%d.%d%s", int y, int m, int d, string tail) && tail == "") dates->write(sprintf("DATE FIELD: %O vs %d.%d.%d\n", id, y, m, d));
 			if (sizeof(matches)) {
 				//if (have_candidate) foreach (matches, [string i, string s]) write("\e[%dm%30s | %s\e[0m\n", i != s, i, s);
+				//if (have_candidate) exit(0, "Now have %O %O\n", id, str);
 				have_candidate = 0;
 				//Desynchronization after candidates and/or synchronization. Save the current block,
 				//but exclude any candidates on the outside of it - we want something surrounded by

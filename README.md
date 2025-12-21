@@ -137,8 +137,18 @@ Savefile notes
   - "01 00 14 00" integer (32-bit) - maybe unsigned?
   - "01 00 40 0d" Take the next string from string_lookup
 * Strings are stored %-2H and are probably UTF-8 but I haven't confirmed this
-* Date might be stored as a number of hours since game start??? 0x036012e8 means 1464-5-18 at 16:00
-* Start date of 1337-4-1 and is 0x034f14a8
+* Dates are stored with a year offset, permitting negative years.
+  - 0x036012e8 means 1464-5-18 at 16:00
+  - Start date of 1337-4-1 is 0x034f14a8
+  - Each day advances you by 24 (hours, even if the date field isn't storing an hour value)
+  - Dates are then numbered from 0 to 364 from Jan 1st to Dec 31st
+    - Leap years don't happen.
+  - Date value: ((year + 5000) * 365 + Julian) * 24
+  - Conversely, if you have a date value:
+    - year, rest = divmod(datevalue, 8760)
+    - day, hour = divmod(rest, 24)
+    - Subtract the largest month value less than the day: 0, 31, 31+28, 31+28+31, 31+28+31+30, ...
+    - Add 1 to the day
 
 
 Falsifiable hypotheses to test
