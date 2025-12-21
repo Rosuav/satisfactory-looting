@@ -241,7 +241,7 @@ array list_strings(Stdio.Buffer buf) {
 int main() {
 	foreach ((Stdio.read_file("eu5textid.dat") || "") / "\n", string line)
 		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
-	#if 0
+	#if 1
 	string path = "/mnt/sata-ssd/.steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
 	string data = Stdio.read_file(path + "/autosave_73fb9c8e-b90c-4a4a-88ea-01304061fa99.eu5");
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
@@ -265,7 +265,6 @@ int main() {
 	array string_sequence = list_strings(buf);
 	werror("Got %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
 	Stdio.write_file("allstrings.json", Standards.JSON.encode(({id_sequence, string_sequence})));
-	return 0;
 	#else
 	[id_sequence, array string_sequence] = Standards.JSON.decode(Stdio.read_file("allstrings.json"));
 	write("Loaded %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
@@ -294,6 +293,7 @@ int main() {
 	array blocks = ({ }), matches = ({ });
 	//Elephant in Cairo: Trigger mismatch detection at the very end so that a final block can be detected.
 	id_sequence += ({"id_sequence"}); string_sequence += ({"string_sequence"});
+	int have_candidate = 0;
 	while (nextid < sizeof(id_sequence) && nextstr < sizeof(string_sequence)) {
 		string id = id_sequence[nextid], str = string_sequence[nextstr];
 		//write("Compare [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
@@ -302,9 +302,12 @@ int main() {
 			//Could be a match, or a candidate! Hang onto it for future analysis.
 			matches += ({({id, str})});
 			++nextid; ++nextstr;
+			if (id[0] == '#') have_candidate = 1;
 		} else {
 			//We have a mismatch.
 			if (sizeof(matches)) {
+				//if (have_candidate) foreach (matches, [string i, string s]) write("\e[%dm%30s | %s\e[0m\n", i != s, i, s);
+				have_candidate = 0;
 				//Desynchronization after candidates and/or synchronization. Save the current block,
 				//but exclude any candidates on the outside of it - we want something surrounded by
 				//synchronization points.
@@ -356,12 +359,12 @@ int main() {
 	werror("Got %d candidacy blocks.\n", sizeof(blocks));
 	mapping sighted = ([]), quality = ([]);
 	foreach (blocks, mapping blk) {
-		//write("- %d candidates at quality %d\n", blk->candidates, blk->quality);
+		write("- %d candidates at quality %d\n", blk->candidates, blk->quality);
 		multiset seen = (<>);
 		foreach (blk->strings, [string id, string str]) {
 			if (seen[id]) continue;
 			seen[id] = 1;
-			//write("\e[%dm%30s | %s\e[0m\n", id != str, id, str); //If they match, it's a context line, not bold. If they're different, bold it.
+			write("\e[%dm%30s | %s\e[0m\n", id != str, id, str); //If they match, it's a context line, not bold. If they're different, bold it.
 			if (id[0] == '#') {
 				if (sighted[id] && sighted[id] != str) {
 					sighted[id] += " :: " + str;
@@ -376,15 +379,17 @@ int main() {
 	array can = ({ }), qual = ({ });
 	array keep = ({ });
 	//Merge in the current string table
-	foreach (id_to_string; int id; string str) {
+	foreach (id_to_string; int id; string str) if (str[0] != '#') {
 		sighted[sprintf("#%04x", id)] = str;
 		quality[sprintf("#%04x", id)] = 1<<30;
 	}
 	foreach (sighted; string id; string str) {
 		//Good ones get saved automatically
-		if (quality[id] >= 1000) keep += ({({id, str})});
+		if (quality[id] >= 25) keep += ({({id, str})});
 		else {
-			//Less good ones get saved as candidates.
+			//Less good ones get saved as candidates. After the ones with higher confidence
+			//get saved and used, they can provide context, which will increase quality of
+			//others. (That might not actually be a good thing though...)
 			can += ({sprintf("%s: [%d] %s\n", id, quality[id], str)});
 			qual += ({-quality[id]});
 		}
