@@ -394,7 +394,19 @@ int main() {
 				//that and resume. Note that, as written here, we will try to keep the skip
 				//distances similar, rather than taking the earliest match. Ideally, we'd find
 				//multi-string matches, rather than accepting the first coincidence we meet.
-				if (id == str) {nextid += skip; nextstr += skip; found = 1; break;}
+				if (id == str) {
+					if (skip == 1) {
+						//We advanced one entry in each array and then found a rematch.
+						//This strongly suggests a one-string mismatch, which may well
+						//be of interest. Report it, with a little context.
+						write("- One-line mismatch -\n");
+						write("%30s | %<s\n", id_sequence[nextid - 1]);
+						write("\e[1m%30s | %s\e[0m\n", id_sequence[nextid], string_sequence[nextstr]);
+						write("%30s | %<s\n", id);
+					}
+					nextid += skip; nextstr += skip; found = 1;
+					break;
+				}
 				if (!undefinedp(idskip[str])) {nextid += idskip[str]; nextstr += skip; found = 1; break;}
 				if (!undefinedp(strskip[id])) {nextstr += strskip[id]; nextid += skip; found = 1; break;}
 				idskip[id] = strskip[str] = skip;
