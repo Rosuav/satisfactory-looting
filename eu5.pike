@@ -101,7 +101,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
 	int trace = 0;
-	if (path == "base-metadata-compatibility-locations") trace = 1;
+	if (path == "base") trace = 2;
 	if (trace) werror("> [%d] Entering %s\n", startpos, path);
 	enum {
 		MODE_EMPTY, //No object seen yet (or the last one seen was the value of a key/value pair).
@@ -201,7 +201,9 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x0d4b: [value] = buf->sscanf("%-4c"); break; //that these two will be 3-byte and 4-bytes
 			case 0x0d4c: [value] = buf->sscanf("%-5c"); break;
 			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
+			case 0x0d43: //Unsure what is going on here; seems to be the same as 0d40??
 			case 0x0d40: value = last_string = string_lookup[buf->read_int8()]; break;
+			case 0x0d44: //Again, possibly same as 0d3e?? Do these type IDs change when the game updates???
 			case 0x0d3e: value = last_string = string_lookup[buf->read_le_int(2)]; break;
 			case 0x0243:
 				//RGB color; should always be followed by type 0003 and a subarray.
