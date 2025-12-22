@@ -100,7 +100,7 @@ array(string) id_sequence = ({ });
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
-	int trace = 2;
+	int trace = 0;
 	if (path == "base-metadata-compatibility-locations") trace = 1;
 	if (trace) werror("> [%d] Entering %s\n", startpos, path);
 	enum {
@@ -112,7 +112,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mixed lastobj; //Relevant in GOTOBJ and GOTKEY modes.
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		if (startpos == 56100957) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
+		if (startpos == 56048258) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
 		if (id == 0) {write("[%d] \e[1;31mNULL entry\e[0m at %d\n", startpos, pos); continue;} //Probable misparse of a previous entry
@@ -193,16 +193,13 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				//Or maybe store it smaller, but only if it's an integer?
 				if (value % 100000 == 0) value /= 100000;
 				break;
-			case 0x0d48:
-				//Seems to be a one-byte integer representing a fixed-point value.
-				//Since the value will be small, it will represent a small fraction eg 48 0d 31 means 0x31=49 == 0.00049
-				value = buf->read_int8();
-				break;
-			case 0x0d49:
-				//Similarly, a two-byte integer for a fixed-point value
-				//Will still be 0<x<1.
-				[value] = buf->sscanf("%-2c");
-				break;
+			//Fixed-point values are stored as integers. Small fixed-point values eg 0.00049 can be stored compactly.
+			//The data type stipulates a number of bytes to read.
+			case 0x0d48: [value] = buf->sscanf("%-1c"); break;
+			case 0x0d49: [value] = buf->sscanf("%-2c"); break;
+			case 0x0d4a: [value] = buf->sscanf("%-3c"); break; //Guessing based on the surroundings
+			case 0x0d4b: [value] = buf->sscanf("%-4c"); break; //that these two will be 3-byte and 4-bytes
+			case 0x0d4c: [value] = buf->sscanf("%-5c"); break;
 			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
 			case 0x0d40: value = last_string = string_lookup[buf->read_int8()]; break;
 			case 0x0d3e: value = last_string = string_lookup[buf->read_le_int(2)]; break;
