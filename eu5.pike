@@ -100,7 +100,7 @@ array(string) id_sequence = ({ });
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
-	int trace = has_value(path, "#31df");
+	int trace = 2;
 	if (path == "base") trace = 2;
 	if (trace) werror("> [%d] Entering %s\n", startpos, path);
 	enum {
@@ -112,7 +112,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mixed lastobj; //Relevant in GOTOBJ and GOTKEY modes.
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		//if (pos == 32757410) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
+		if (startpos == 56100957) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
 		if (id == 0) {write("[%d] \e[1;31mNULL entry\e[0m at %d\n", startpos, pos); continue;} //Probable misparse of a previous entry
@@ -125,7 +125,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		if (mode == MODE_GOTOBJ) {
 			arr += ({lastobj});
 			mode = MODE_EMPTY;
-			if (trace == 2) werror("| Recording value %O\n", id);
+			if (trace == 2) werror("| Recording value %O\n", lastobj);
 		}
 		if (id == 0x4b50) {
 			//In a non-debug savefile, everything after the metadata is packaged up as a zip file.
@@ -189,6 +189,16 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				//Or maybe store it smaller, but only if it's an integer?
 				if (value % 100000 == 0) value /= 100000;
 				break;
+			case 0x0d48:
+				//Seems to be a one-byte integer representing a fixed-point value.
+				//Since the value will be small, it will represent a small fraction eg 48 0d 31 means 0x31=49 == 0.00049
+				value = buf->read_int8();
+				break;
+			case 0x0d49:
+				//Similarly, a two-byte integer for a fixed-point value
+				//Will still be 0<x<1.
+				[value] = buf->sscanf("%-2c");
+				break;
 			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
 			case 0x0d40: value = last_string = string_lookup[buf->read_int8()]; break;
 			case 0x0d3e: value = last_string = string_lookup[buf->read_le_int(2)]; break;
@@ -219,7 +229,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		else {
 			map[lastobj] = value;
 			mode = MODE_EMPTY;
-			if (trace == 2) werror("| Recording key %O\n", id);
+			if (trace == 2) werror("| Recording key %O\n", lastobj);
 		}
 	}
 	if (sizeof(map) && sizeof(arr)) {
@@ -303,8 +313,8 @@ int main() {
 	if (header[23..] != "00000000") exit(1, "Bad end-of-header %O\n", header[23..]);
 	mapping toplevel = read_maparray(buf, "base");
 	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
-	werror("Toplevel: %O\n", indices(toplevel));
-	//exit(0, "Got %d IDs.\n", sizeof(id_sequence));
+	werror("Toplevel: %t %O\n", toplevel, indices(toplevel));
+	exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
 	data = Stdio.read_file(path + "/SP_TUR_1337_04_01_907a8a9e-6b68-45d2-9a68-89b2a7381a64_0.eu5");
 	buf = Stdio.Buffer(data); buf->read_only();
