@@ -101,7 +101,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
 	int trace = 2;
-	if (path == "base") trace = 2;
+	if (path == "base-metadata-compatibility-locations") trace = 1;
 	if (trace) werror("> [%d] Entering %s\n", startpos, path);
 	enum {
 		MODE_EMPTY, //No object seen yet (or the last one seen was the value of a key/value pair).
@@ -163,6 +163,10 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x0003:
 				if (mode == MODE_GOTKEY && (stringp(lastobj) || intp(lastobj)))
 					value = read_maparray(buf, path + "-" + lastobj);
+				else if (mode == MODE_EMPTY)
+					//It's possible that this is a subobject key, but more likely it's
+					//an array entry, so show the path accordingly.
+					value = read_maparray(buf, path + "[]");
 				else value = read_maparray(buf, sprintf("%s-%t", path, lastobj)); //eg "base-somekey-somekey-mapping" which is weird but at least it's something
 				break;
 			case 0x029c: //64-bit integer, used for general-purpose numbers
@@ -208,7 +212,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				//insert that token into the string stream as if we'd found it.
 				id_sequence += ({"rgb"});
 				if (buf->read(2) != "\x03\x00") exit(1, "UNKNOWN 0243 at pos %d\n", pos);
-				value = read_maparray(buf, path + "-" + id + ":rgb");
+				value = read_maparray(buf, path + "-" + lastobj + ":rgb");
 				break;
 			case 0x000e:
 				//werror("\e[1;34mGOT BOOLEAN\e[0m NEXT%{ %02x%}\n", (array)(string)buf[..16]);
