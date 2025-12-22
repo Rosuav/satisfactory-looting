@@ -191,6 +191,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				if (value >= (1<<63)) value -= 1<<64; //Signed integer. I think they're all signed???
 				//Or maybe store it smaller, but only if it's an integer?
 				if (value % 100000 == 0) value /= 100000;
+				//TODO: Do the above translations also for the shorter integers
 				break;
 			//Fixed-point values are stored as integers. Small fixed-point values eg 0.00049 can be stored compactly.
 			//The data type stipulates a number of bytes to read.
