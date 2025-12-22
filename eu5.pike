@@ -161,8 +161,9 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		mixed value;
 		switch (id) {
 			case 0x0003:
-				//FIXME: Adding the ID here will just always give 3
-				value = read_maparray(buf, path + "-" + id);
+				if (mode == MODE_GOTKEY && (stringp(lastobj) || intp(lastobj)))
+					value = read_maparray(buf, path + "-" + lastobj);
+				else value = read_maparray(buf, sprintf("%s-%t", path, lastobj)); //eg "base-somekey-somekey-mapping" which is weird but at least it's something
 				break;
 			case 0x029c: //64-bit integer, used for general-purpose numbers
 				[value] = buf->sscanf("%-8c");
