@@ -112,7 +112,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mixed lastobj; //Relevant in GOTOBJ and GOTKEY modes.
 	while (sizeof(buf)) {
 		int pos = sizeof(buf);
-		if (startpos == 56048258) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
+		//if (startpos == 50029794) werror("POS %d NEXT%{ %02x%}\n", pos, (array)(string)buf[..255]);
 		int|string id = buf->read_le_int(2);
 		if (id == 4) break; //End of object
 		if (id == 0) {write("[%d] \e[1;31mNULL entry\e[0m at %d\n", startpos, pos); continue;} //Probable misparse of a previous entry
@@ -200,6 +200,12 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			case 0x0d4a: [value] = buf->sscanf("%-3c"); break; //Guessing based on the surroundings
 			case 0x0d4b: [value] = buf->sscanf("%-4c"); break; //that these two will be 3-byte and 4-bytes
 			case 0x0d4c: [value] = buf->sscanf("%-5c"); break;
+			case 0x0d4d: case 0x0d4e: exit(1, "[%d] GOT %04x at pos %d, NEXT%{ %02x%}\n", startpos, id, pos, (array)(string)buf[..9]); //Might be looking for six and seven bytes respectively
+			case 0x0d4f: [value] = buf->sscanf("%-1c"); value = -value; break; //Small negative values???
+			case 0x0d50: [value] = buf->sscanf("%-2c"); value = -value; break; //There isn't room for an eight byte here but maybe that's just 0167
+			case 0x0d51: [value] = buf->sscanf("%-3c"); value = -value; break;
+			case 0x0d52: [value] = buf->sscanf("%-4c"); value = -value; break;
+			case 0x0d53..0x0d56: exit(1, "[%d] GOT %04x at pos %d, NEXT%{ %02x%}\n", startpos, id, pos, (array)(string)buf[..9]); //Might be looking for six and seven bytes respectively
 			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
 			case 0x0d43: //Unsure what is going on here; seems to be the same as 0d40??
 			case 0x0d40: value = last_string = string_lookup[buf->read_int8()]; break;
