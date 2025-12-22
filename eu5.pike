@@ -101,7 +101,6 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
 	int trace = 0;
-	if (path == "base") trace = 2;
 	if (trace) werror("> [%d] Entering %s\n", startpos, path);
 	enum {
 		MODE_EMPTY, //No object seen yet (or the last one seen was the value of a key/value pair).
@@ -323,7 +322,7 @@ int main() {
 	mapping toplevel = read_maparray(buf, "base");
 	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
 	werror("Toplevel: %t %O\n", toplevel, indices(toplevel));
-	exit(0, "Got %d IDs.\n", sizeof(id_sequence));
+	//exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
 	data = Stdio.read_file(path + "/SP_TUR_1337_04_01_907a8a9e-6b68-45d2-9a68-89b2a7381a64_0.eu5");
 	buf = Stdio.Buffer(data); buf->read_only();
