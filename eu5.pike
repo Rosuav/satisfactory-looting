@@ -101,6 +101,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
 	int trace = has_value(path, "#31df");
+	if (path == "base") trace = 2;
 	if (trace) werror("> [%d] Entering %s\n", startpos, path);
 	enum {
 		MODE_EMPTY, //No object seen yet (or the last one seen was the value of a key/value pair).
@@ -124,7 +125,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		if (mode == MODE_GOTOBJ) {
 			arr += ({lastobj});
 			mode = MODE_EMPTY;
-			if (trace == 2) werror("| Recording key %s\n", id);
+			if (trace == 2) werror("| Recording value %O\n", id);
 		}
 		if (id == 0x4b50) {
 			//In a non-debug savefile, everything after the metadata is packaged up as a zip file.
@@ -217,7 +218,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 		else {
 			map[lastobj] = value;
 			mode = MODE_EMPTY;
-			if (trace == 2) werror("| Recording key %s\n", id);
+			if (trace == 2) werror("| Recording key %O\n", id);
 		}
 	}
 	if (sizeof(map) && sizeof(arr)) {
@@ -288,7 +289,7 @@ int main() {
 		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
 	#if 1
 	string path = "/mnt/sata-ssd/.steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
-	string data = Stdio.read_file(path + "/autosave_73fb9c8e-b90c-4a4a-88ea-01304061fa99.eu5");
+	string data = Stdio.read_file(path + "/SP_TUR_1337_04_01_907a8a9e-6b68-45d2-9a68-89b2a7381a64.eu5");
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
 	[string header] = buf->sscanf("%s\n");
 	if (header[..2] != "SAV") exit(1, "Not an EU5 save file\n");
@@ -304,7 +305,7 @@ int main() {
 	werror("Toplevel: %O\n", indices(toplevel));
 	//exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
-	data = Stdio.read_file(path + "/SP_SPA_1464_05_18_73fb9c8e-b90c-4a4a-88ea-01304061fa99.eu5");
+	data = Stdio.read_file(path + "/SP_TUR_1337_04_01_907a8a9e-6b68-45d2-9a68-89b2a7381a64_0.eu5");
 	buf = Stdio.Buffer(data); buf->read_only();
 	buf->sscanf("%s\n");
 	array string_sequence = list_strings(buf);
