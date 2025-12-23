@@ -35,6 +35,9 @@ __async__ void http_handler(Protocols.HTTP.Server.Request req) {
 	resp->extra_heads["Access-Control-Allow-Origin"] = "*";
 	resp->extra_heads["Access-Control-Allow-Private-Network"] = "true";
 	req->response_and_finish(resp);
+	//As is the case in Stillebot, forcing garbage collection periodically
+	//seems to be useful. Why, I'm not sure, though.
+	gc();
 }
 
 void ws_msg(Protocols.WebSocket.Frame frm, mapping conn) {
