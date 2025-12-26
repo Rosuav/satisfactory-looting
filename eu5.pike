@@ -325,6 +325,7 @@ int main() {
 	mapping toplevel = read_maparray(buf, "base");
 	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
 	werror("Toplevel: %t %O\n", toplevel, indices(toplevel));
+	if (!unknownids) return 0; //Yay!
 	//exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
 	data = Stdio.read_file(path + "/SP_TUR_1337_04_01_907a8a9e-6b68-45d2-9a68-89b2a7381a64_0.eu5");
@@ -332,8 +333,6 @@ int main() {
 	buf->sscanf("%s\n");
 	array string_sequence = list_strings(buf);
 	werror("Got %d IDs and %d strings; %d unknown IDs.\n", sizeof(id_sequence), sizeof(string_sequence), unknownids);
-
-	if (!unknownids) return 0; //Yay!
 
 	//Attempt to diff the two arrays.
 	//In the id sequence, anything beginning with a hash (eg "#3206") is incomparable.
