@@ -1,81 +1,5 @@
-mapping(int:string) id_to_string = ([
-	0x001b: "name",
-	0x0041: "object",
- 	0x006d: "duration",
- 	0x006e: "speed",
-	0x00db: "identity",
-	0x00e1: "type",
- 	0x00ee: "version",
- 	0x00f0: "data",
-	0x025a: "top",
-	0x0351: "list",
-	0x0352: "item",
- 	0x0384: "flag",
- 	0x0555: "variables",
- 	0x06b3: "random_seed",
- 	0x06b4: "random_count",
- 	0x06b5: "date",
- 	0x096e: "playthrough_id",
- 	0x096f: "playthrough_name",
- 	0x0971: "save_label",
- 	0x09de: "metadata",
- 	0x0c53: "members",
-	0x2915: "power",
- 	0x2cd7: "country",
- 	0x2ce7: "enabled_dlcs",
- 	0x2dc0: "locations",
- 	0x2dc1: "ironman_manager",
- 	0x2f44: "current_age",
-	0x30a1: "great_power_manager",
-	0x314a: "language_manager",
- 	0x3224: "start_of_day",
- 	0x3237: "compatibility",
- 	0x3238: "locations_hash",
- 	0x325b: "hegemons",
- 	0x3477: "code_version_info",
- 	0x3478: "code_hash_long",
- 	0x3479: "code_hash_short",
- 	0x347a: "code_timestamp",
- 	0x347b: "code_branch",
- 	0x347c: "game_code_info",
- 	0x347d: "engine_code_info",
- 	0x35c3: "code_commit",
-	0x3bb5: "player_country_name",
-	0x2df2: "char",
-	0x02d2: "value",
-	0x0500: "boolean",
-	0x2dd6: "cult",
-	0x2de4: "relg",
-	0x2ddc: "regn",
-	0x2ddf: "loc",
-	0x2cd6: "ctry",
-	0x04ff: "prov",
-	0x315c: "rebl",
-	0x3100: "reli",
-	0x393e: "formable_country",
-	0x32e3: "international_organization",
-	0x2d06: "area",
-	0x0165: "none",
-	0x355d: "law",
-	0x355e: "policy",
-	0x3130: "situation",
-	0x3646: "disease_outbreak",
-	0x2e0b: "patronym",
-	0x2e0c: "descendant",
-	0x2e90: "estate",
-	0x27f6: "location",
-	0x27f7: "unit",
-	0x27d2: "province",
-	0x2e4f: "gathering",
-	0x2d4a: "navy",
-	0x2d4f: "combat",
-	0x3a54: "location_ancient",
-	0x2817: "active",
-	0x3132: "before",
-	0x30e2: "available",
-	0x30e3: "hired",
-	0x2e73: "construction",
-]);
+constant EU5_SAVE_PATH = "../.steam/steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
+mapping(int:string) id_to_string = ([]);
 
 mapping(int:string) idx_to_date = ([]); //Convenience lookup - 0 maps to "1.1" for Jan 1st, 364 maps to "12.31"
 string date_to_string(int date) {
@@ -279,8 +203,8 @@ int main() {
 	//Dates consist of (year * 365 + date value) * 24 + hour, where the date value is basically the Julian day number (ignoring leap years).
 	foreach ((Stdio.read_file("eu5textid.dat") || "") / "\n", string line)
 		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
-	string path = "/mnt/sata-ssd/.steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
-	string data = Stdio.read_file(path + "/SP_JAP_1337_04_01_f3c5fd0a-f5b1-4573-96b7-2362abc48265.eu5");
+	string fn = "SP_JAP_1337_04_01_f3c5fd0a-f5b1-4573-96b7-2362abc48265.eu5";
+	string data = Stdio.read_file(EU5_SAVE_PATH + "/" + fn);
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
 	[string header] = buf->sscanf("%s\n");
 	if (header[..2] != "SAV") exit(1, "Not an EU5 save file\n");
@@ -326,7 +250,7 @@ int main() {
 	if (!unknownids) return 0; //Yay!
 	//exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
-	data = Stdio.read_file(path + "/SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_1.eu5");
+	data = Stdio.read_file(EU5_SAVE_PATH + "/SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_1.eu5");
 	buf = Stdio.Buffer(data); buf->read_only();
 	buf->sscanf("%s\n");
 	array string_sequence = list_strings(buf);
