@@ -148,7 +148,53 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	return sizeof(arr) ? arr : map;
 }
 
-array list_strings(Stdio.Buffer buf) {
+mapping eu5_parse_savefile(string fn) {
+	string data = Stdio.read_file(EU5_SAVE_PATH + "/" + fn);
+	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
+	[string header] = buf->sscanf("%s\n");
+	if (header[..2] != "SAV") exit(1, "Not an EU5 save file\n");
+	//If any of these assertions fails, we probably need to make this parser more flexible.
+	//They will very likely indicate that changes are needed elsewhere.
+	sscanf(header, "SAV%2x%2x%*8x%8x%8x", int version, int type, int metasize, int padding);
+	if (version != 2) exit(1, "Bad version %O\n", header[3..4]);
+	if (type == 0) exit(1, "TODO: Support text saves too\n");
+	else if (type != 3) exit(1, "Unsupported type %O\n", header[5..6]);
+	if (padding) exit(1, "Nonzeropadding %O\n", header[23..]);
+
+	if (type == 3) {
+		//Currently the only type supported - compressed binary.
+		//Skip the uncompressed metadata block, as it's duplicated into the compressed content.
+		buf->consume(metasize);
+		if (buf->read(4) != "PK\3\4") exit(1, "Malformed compressed savefile\n");
+		//Pike comes with a Filesystem.Zip interface but it's not really optimized for this
+		//sort of job, so instead we do our own parsing.
+		mapping files = ([]);
+		while (sizeof(buf)) {
+			[int minver, int flags, int comp, int ignore, int compsz, int decompsz, int fnlen, int xtralen] = buf->sscanf("%-2c%-2c%-2c%-8c%-4c%-4c%-2c%-2c");
+			string fn = buf->read(fnlen);
+			string xtra = buf->read(xtralen);
+			string raw = buf->read(compsz);
+			string decomp = Gz.inflate(-15)->inflate(raw);
+			//assert sizeof(decomp) == decompsz
+			files[fn] = decomp;
+			if (buf->read(4) != "PK\3\4") break; //After all files, there's a "PK\1\2" central directory, which we don't need
+		}
+		//Note that we have to read both files before we can parse, as the string_lookup is generally
+		//placed *after* the gamestate. No big deal as we have to have it all in memory anyway.
+		buf = Stdio.Buffer(files->string_lookup); buf->read_only();
+		[int unk1, int count, int unk3] = buf->sscanf("%c%-2c%-2c");
+		while (sizeof(buf)) string_lookup += buf->sscanf("%-2H");
+		//Stdio.File str = Stdio.File("string_lookup", "wct"); foreach (string_lookup; int i; string s) str->write("%04x: %s\n", i, s);
+		//Sweet. Now we can switch out to the compressed game state.
+		buf = Stdio.Buffer(files->gamestate); buf->read_only();
+	}
+	return read_maparray(buf, "base");
+}
+
+array list_strings(string fn) {
+	Stdio.Buffer buf = Stdio.Buffer(Stdio.read_file(EU5_SAVE_PATH + "/" + fn));
+	buf->read_only();
+	buf->sscanf("%s\n");
 	array strings = ({ });
 	while (1) {
 		buf->sscanf("%*[ \t\r\n]");
@@ -203,57 +249,13 @@ int main() {
 	//Dates consist of (year * 365 + date value) * 24 + hour, where the date value is basically the Julian day number (ignoring leap years).
 	foreach ((Stdio.read_file("eu5textid.dat") || "") / "\n", string line)
 		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
-	string fn = "SP_JAP_1337_04_01_f3c5fd0a-f5b1-4573-96b7-2362abc48265.eu5";
-	string data = Stdio.read_file(EU5_SAVE_PATH + "/" + fn);
-	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
-	[string header] = buf->sscanf("%s\n");
-	if (header[..2] != "SAV") exit(1, "Not an EU5 save file\n");
-	//If any of these assertions fails, we probably need to make this parser more flexible.
-	//They will very likely indicate that changes are needed elsewhere.
-	sscanf(header, "SAV%2x%2x%*8x%8x%8x", int version, int type, int metasize, int padding);
-	if (version != 2) exit(1, "Bad version %O\n", header[3..4]);
-	if (type == 0) exit(1, "TODO: Support text saves too\n");
-	else if (type != 3) exit(1, "Unsupported type %O\n", header[5..6]);
-	if (padding) exit(1, "Nonzeropadding %O\n", header[23..]);
-
-	if (type == 3) {
-		//Currently the only type supported - compressed binary.
-		//Skip the uncompressed metadata block, as it's duplicated into the compressed content.
-		buf->consume(metasize);
-		if (buf->read(4) != "PK\3\4") exit(1, "Malformed compressed savefile\n");
-		//Pike comes with a Filesystem.Zip interface but it's not really optimized for this
-		//sort of job, so instead we do our own parsing.
-		mapping files = ([]);
-		while (sizeof(buf)) {
-			[int minver, int flags, int comp, int ignore, int compsz, int decompsz, int fnlen, int xtralen] = buf->sscanf("%-2c%-2c%-2c%-8c%-4c%-4c%-2c%-2c");
-			string fn = buf->read(fnlen);
-			string xtra = buf->read(xtralen);
-			string raw = buf->read(compsz);
-			string decomp = Gz.inflate(-15)->inflate(raw);
-			//assert sizeof(decomp) == decompsz
-			files[fn] = decomp;
-			if (buf->read(4) != "PK\3\4") break; //After all files, there's a "PK\1\2" central directory, which we don't need
-		}
-		//Note that we have to read both files before we can parse, as the string_lookup is generally
-		//placed *after* the gamestate. No big deal as we have to have it all in memory anyway.
-		buf = Stdio.Buffer(files->string_lookup); buf->read_only();
-		[int unk1, int count, int unk3] = buf->sscanf("%c%-2c%-2c");
-		while (sizeof(buf)) string_lookup += buf->sscanf("%-2H");
-		//Stdio.File str = Stdio.File("string_lookup", "wct"); foreach (string_lookup; int i; string s) str->write("%04x: %s\n", i, s);
-		//Sweet. Now we can switch out to the compressed game state.
-		buf = Stdio.Buffer(files->gamestate); buf->read_only();
-	}
-
-	mapping toplevel = read_maparray(buf, "base");
-	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
-	werror("Toplevel: %t %O\n", toplevel, indices(toplevel));
+	mapping savefile = eu5_parse_savefile("SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_0.eu5");
+	//savefile->metadata->compatibility->locations = savefile->metadata->flag = "(...)";
+	werror("Toplevel: %t %O\n", savefile, indices(savefile));
 	if (!unknownids) return 0; //Yay!
 	//exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
-	data = Stdio.read_file(EU5_SAVE_PATH + "/SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_1.eu5");
-	buf = Stdio.Buffer(data); buf->read_only();
-	buf->sscanf("%s\n");
-	array string_sequence = list_strings(buf);
+	array string_sequence = list_strings("SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_1.eu5");
 	werror("Got %d IDs and %d strings; %d unknown IDs.\n", sizeof(id_sequence), sizeof(string_sequence), unknownids);
 
 	//Attempt to diff the two arrays.
