@@ -410,6 +410,9 @@ int main() {
 			//First iteration of this loop looks at the same id/str as we already have, then we advance from there.
 			//write("DESYNC: [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 			int found = 0;
+			void advance(int skipids, int skipstrs) {
+				nextid += skipids; nextstr += skipstrs; found = 1;
+			}
 			for (int skip = 0; nextid + skip < sizeof(id_sequence) && nextstr + skip < sizeof(string_sequence); ++skip) {
 				id = id_sequence[nextid + skip]; str = string_sequence[nextstr + skip];
 				//When skip is (say) 4, we've scanned 4 entries forward in each array.
@@ -427,11 +430,12 @@ int main() {
 						write("\e[1m%30s | %s\e[0m\n", id_sequence[nextid], string_sequence[nextstr]);
 						write("%30s | %<s\n", id);
 					}
-					nextid += skip; nextstr += skip; found = 1;
+					advance(skip, skip);
 					break;
 				}
-				if (!undefinedp(idskip[str])) {nextid += idskip[str]; nextstr += skip; found = 1; break;}
-				if (!undefinedp(strskip[id])) {nextstr += strskip[id]; nextid += skip; found = 1; break;}
+				//if (id[0] == '#') werror("CHECKING/SKIPPING %O %O\n", id, str);
+				if (!undefinedp(idskip[str])) {advance(idskip[str], skip); break;}
+				if (!undefinedp(strskip[id])) {advance(skip, strskip[id]); break;}
 				idskip[id] = strskip[str] = skip;
 			}
 			/* else: */ if (!found) break; //If no resync point was found, we must have hit the end.
