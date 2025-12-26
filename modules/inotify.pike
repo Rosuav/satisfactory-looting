@@ -209,21 +209,39 @@ void watch_game_log(object inot) {
 	};
 }
 
+//Detect a "save, then move to target filename" pattern. If the file gets saved to a temporary
+//name, then renamed to the permanent name (possibly after moving away the previous resident of
+//that name), this will detect it, and notify the hooks with the given category.
+mapping SAVE_MOVE_PATHS = ([
+	EU4_LOCAL_PATH + "/save games": "eu4",
+	EU5_SAVE_PATH: "eu5",
+]);
+string new_file; int nomnomcookie;
+void detect_save_move(int event, int cookie, string path) {
+	switch (event) {
+		case System.Inotify.IN_CLOSE_WRITE: new_file = path; break;
+		case System.Inotify.IN_MOVED_FROM: if (path == new_file) {new_file = 0; nomnomcookie = cookie;} break;
+		case System.Inotify.IN_MOVED_TO: if (cookie == nomnomcookie) {
+			nomnomcookie = 0;
+			foreach (SAVE_MOVE_PATHS; string pfx; string cat) if (has_prefix(path, pfx)) {
+				werror("Got a save-move for cat %O\n", cat);
+				werror("Hooks: %O\n", G->G->inotify_hooks);
+				foreach (values(G->G->inotify_hooks), function hook)
+					if (mixed ex = catch (hook(cat, path)))
+						werror("Unhandled exception in %s hook %O\n%s\n", cat, path, describe_backtrace(ex));
+				break;
+			}
+		}
+		break;
+	}
+}
+
 protected void create(string name) {
 	::create(name);
 	if (G->G->inotify) destruct(G->G->inotify); //Hack. TODO: Keep the inotify and change the code it calls, rather than closing it and start over.
 	object inot = G->G->inotify = System.Inotify.Instance();
-	string new_file; int nomnomcookie;
-	inot->add_watch(EU4_LOCAL_PATH + "/save games", System.Inotify.IN_CLOSE_WRITE | System.Inotify.IN_MOVED_TO | System.Inotify.IN_MOVED_FROM) {
-		[int event, int cookie, string path] = __ARGS__;
-		//EU4 seems to always save into a temporary file, then rename it over the target. This
-		//sometimes includes renaming the target out of the way first (eg old_autosave.eu4).
-		switch (event) {
-			case System.Inotify.IN_CLOSE_WRITE: new_file = path; break;
-			case System.Inotify.IN_MOVED_FROM: if (path == new_file) {new_file = 0; nomnomcookie = cookie;} break;
-			case System.Inotify.IN_MOVED_TO: if (cookie == nomnomcookie) {nomnomcookie = 0; G->G->parser->process_savefile(path);} break;
-		}
-	};
+	foreach (SAVE_MOVE_PATHS; string path;)
+		inot->add_watch(path, System.Inotify.IN_CLOSE_WRITE | System.Inotify.IN_MOVED_TO | System.Inotify.IN_MOVED_FROM, detect_save_move);
 	inot->add_watch(SATIS_SAVE_PATH, System.Inotify.IN_CLOSE_WRITE | System.Inotify.IN_DELETE) {
 		//In contrast to EU4, which *moves* files to the target name, Satisfactory always writes directly,
 		//possibly after moving the old file away. So we take the easy option and just report when a file

@@ -1,8 +1,6 @@
 //Parsers of various kinds, but mostly the EU4 Text format (used by config files,
-//save files, etc, etc). Can be invoked from the command line to parse a save file.
-#if !constant(G)
-mapping G = ([]); //Prevent compilation errors, but none of the G-> lookups will work
-#endif
+//save files, etc, etc). Can be invoked with "pike app --parse" to parse a save file.
+inherit annotated;
 Parser.LR.Parser parser = Parser.LR.GrammarParser.make_parser_from_file("modules/eu4_parser.grammar");
 
 int retain_map_indices = 0;
@@ -823,7 +821,8 @@ void update_all_eu4() {G->G->websocket_types->tag->update_all_groups();}
 //Spawn and communicate with the parser subprocess
 Stdio.File parser_pipe = G->G->parser_pipe;
 int parsing = -1;
-void process_savefile(string fn) {parsing = 0; call_out(update_all_eu4, 0); parser_pipe->write(fn + "\n");}
+void process_savefile(string fn) {parsing = 0; call_out(update_all_eu4, 0); parser_pipe->write(fn + "\n");} //Called externally by http/load.pike
+@inotify_hook: void savefile_changed(string cat, string fn) {if (cat == "eu4") process_savefile(fn);}
 void parser_pipe_msg(object pipe, string msg) {
 	msg += parser_pipe->read() || ""; //Purge any spare text
 	foreach ((array)msg, int chr) {
@@ -866,7 +865,8 @@ void spawn() {
 	if (sizeof(files)) process_savefile(files[-1]);
 }
 
-protected void create() {
+protected void create(string name) {
+	::create(name);
 	//TODO: Replace G->CFG with a mapping from checksum to game config.
 	//Whenever something needs the config, look up the checksum, and fetch the config
 	//as needed. Whenever something needs the config for a specific file, ???. And

@@ -13,6 +13,7 @@ constant SATIS_PROGRAM_PATH = "../.steam/steamapps/common/Satisfactory";
 constant EU4_LOCAL_PATH = "../.local/share/Paradox Interactive/Europa Universalis IV";
 //constant EU4_SAVE_PATH = LOCAL_PATH + "/save games"; //Not actually a constant
 constant EU4_PROGRAM_PATH = "../.steam/steam/steamapps/common/Europa Universalis IV"; //Append /map or /common etc to access useful data files
+constant EU5_SAVE_PATH = "../.steam/steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
 
 constant CONFIG_FILE = "preferences.json";
 
