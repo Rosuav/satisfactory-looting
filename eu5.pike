@@ -97,6 +97,7 @@ int date_to_int(int y, int m, int d, int h) {
 array string_lookup = ({ });
 string last_string = "?";
 array(string) id_sequence = ({ });
+int unknownids = 0;
 mapping|array read_maparray(Stdio.Buffer buf, string path) {
 	mapping map = ([]); array arr = ({ });
 	int startpos = sizeof(buf);
@@ -230,6 +231,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				if (!id_to_string[id]) {
 					//werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
 					id_to_string[id] = sprintf("#%04x", id);
+					++unknownids;
 				}
 				value = id_to_string[id];
 		}
@@ -329,7 +331,7 @@ int main() {
 	buf = Stdio.Buffer(data); buf->read_only();
 	buf->sscanf("%s\n");
 	array string_sequence = list_strings(buf);
-	werror("Got %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
+	werror("Got %d IDs and %d strings; %d unknown IDs.\n", sizeof(id_sequence), sizeof(string_sequence), unknownids);
 	Stdio.write_file("allstrings.json", Standards.JSON.encode(({id_sequence, string_sequence})));
 	#else
 	[id_sequence, array string_sequence] = Standards.JSON.decode(Stdio.read_file("allstrings.json"));
