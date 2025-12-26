@@ -411,6 +411,21 @@ int main() {
 			//write("DESYNC: [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 			int found = 0;
 			void advance(int skipids, int skipstrs) {
+				if (0) foreach (id_sequence[nextid..nextid+skipids-1], string id) if (id[0] == '#') {
+					//If there's any ID with a hash in it, report the block.
+					write("- Mismatch, %d:%d -\e[K\n", skipids, skipstrs);
+					int i = -1;
+					for (; i < skipids || i < skipstrs; ++i)
+						write("%30s | %s\n",
+							i < skipids ? id_sequence[nextid + i] : "",
+							i < skipstrs ? string_sequence[nextstr + i] : "",
+						);
+					//And one line of context. In reality, the alignment may work better if the
+					//gap is somewhere other than immediately before the context line, but this
+					//will give at least some idea.
+					write("%30s | %s\n", id_sequence[nextid + skipids], string_sequence[nextstr + skipstrs]);
+					break;
+				}
 				nextid += skipids; nextstr += skipstrs; found = 1;
 			}
 			for (int skip = 0; nextid + skip < sizeof(id_sequence) && nextstr + skip < sizeof(string_sequence); ++skip) {
