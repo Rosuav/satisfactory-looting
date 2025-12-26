@@ -229,7 +229,8 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 				//If misparses happen, start reporting unknowns, as they may actually require additional
 				//data bytes.
 				if (!id_to_string[id]) {
-					//werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
+					//This could be spammy; consider suppressing the noise if we're going to diff afterwards
+					werror("UNKNOWN MAPPING KEY ID %04x at path %s\nLast string: %s\n", id, path, last_string);
 					id_to_string[id] = sprintf("#%04x", id);
 					++unknownids;
 				}
@@ -309,7 +310,6 @@ int main() {
 	//Dates consist of (year * 365 + date value) * 24 + hour, where the date value is basically the Julian day number (ignoring leap years).
 	foreach ((Stdio.read_file("eu5textid.dat") || "") / "\n", string line)
 		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
-	#if 1
 	string path = "/mnt/sata-ssd/.steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
 	string data = Stdio.read_file(path + "/SP_TUR_1337_04_01_907a8a9e-6b68-45d2-9a68-89b2a7381a64.eu5");
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
@@ -332,11 +332,8 @@ int main() {
 	buf->sscanf("%s\n");
 	array string_sequence = list_strings(buf);
 	werror("Got %d IDs and %d strings; %d unknown IDs.\n", sizeof(id_sequence), sizeof(string_sequence), unknownids);
-	Stdio.write_file("allstrings.json", Standards.JSON.encode(({id_sequence, string_sequence})));
-	#else
-	[id_sequence, array string_sequence] = Standards.JSON.decode(Stdio.read_file("allstrings.json"));
-	write("Loaded %d IDs and %d strings.\n", sizeof(id_sequence), sizeof(string_sequence));
-	#endif
+
+	if (!unknownids) return 0; //Yay!
 
 	//Attempt to diff the two arrays.
 	//In the id sequence, anything beginning with a hash (eg "#3206") is incomparable.
@@ -366,15 +363,18 @@ int main() {
 		string id = id_sequence[nextid], str = string_sequence[nextstr];
 		//write("Compare [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 		werror("Comparing... %.1f%%...\r", nextid * 100.0 / sizeof(id_sequence));
-		if (id == str || id[0] == '#') {
+		if (id == str || id[0] == '#' || id == (string)((int)str * 100000) || id == (string)((int)str + (1<<32))) {
 			//Could be a match, or a candidate! Hang onto it for future analysis.
+			//Note that we consider "4500000" equal to "45" as we are currently
+			//unable to determine which integers represent fixed point and which
+			//are as-is. Similarly for signed/unsigned numbers.
 			matches += ({({id, str})});
 			++nextid; ++nextstr;
 			if (id[0] == '#') have_candidate = 1;
 		} else {
 			//We have a mismatch.
 			if (sizeof(matches)) {
-				//if (have_candidate) foreach (matches, [string i, string s]) write("\e[%dm%30s | %s\e[0m\n", i != s, i, s);
+				//if (have_candidate) foreach (matches[..<10], [string i, string s]) write("\e[%dm%30s | %s\e[0m\n", i != s, i, s);
 				//if (have_candidate) exit(0, "Now have %O %O\n", id, str);
 				have_candidate = 0;
 				//Desynchronization after candidates and/or synchronization. Save the current block,
@@ -411,6 +411,7 @@ int main() {
 			//write("DESYNC: [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
 			int found = 0;
 			void advance(int skipids, int skipstrs) {
+				//Activate this for manual review of every discrepancy that contains an unknown
 				if (0) foreach (id_sequence[nextid..nextid+skipids-1], string id) if (id[0] == '#') {
 					//If there's any ID with a hash in it, report the block.
 					write("- Mismatch, %d:%d -\e[K\n", skipids, skipstrs);
@@ -436,11 +437,13 @@ int main() {
 				//distances similar, rather than taking the earliest match. Ideally, we'd find
 				//multi-string matches, rather than accepting the first coincidence we meet.
 				if (id == str) {
-					if (skip == 1) {
+					//Activate this for manual review of single-line discrepancies, which
+					//could indicate that more flexible comparisons are needed.
+					if (0 && skip == 1) {
 						//We advanced one entry in each array and then found a rematch.
 						//This strongly suggests a one-string mismatch, which may well
 						//be of interest. Report it, with a little context.
-						write("- One-line mismatch -\n");
+						write("- One-line mismatch block -\n");
 						write("%30s | %<s\n", id_sequence[nextid - 1]);
 						write("\e[1m%30s | %s\e[0m\n", id_sequence[nextid], string_sequence[nextstr]);
 						write("%30s | %<s\n", id);
@@ -495,7 +498,7 @@ int main() {
 		}
 	}
 	sort(qual, can);
-	Stdio.write_file("candidates.txt", can * "");
+	if (sizeof(can)) Stdio.write_file("candidates.txt", can * "");
 	sort(keep[*][0], keep);
 	Stdio.write_file("eu5textid.dat", sprintf("%{%s %s\n%}", keep));
 }
