@@ -127,37 +127,6 @@ mapping|array read_maparray(Stdio.Buffer buf, string path) {
 			mode = MODE_EMPTY;
 			if (trace == 2) werror("| Recording value %O\n", lastobj);
 		}
-		if (id == 0x4b50) {
-			//In a non-debug savefile, everything after the metadata is packaged up as a zip file.
-			//It can be recognized by the "PK" signature (50 4b), which is then followed by 03 04.
-			//Pike comes with a Filesystem.Zip interface but it's not really optimized for this
-			//sort of job, so instead we do our own parsing.
-			//(It may be easier, instead, to start at the end of central directory, and not parse
-			//the initial uncompressed header. All the content seems to be replicated anyway.)
-			if (buf->read(2) != "\3\4") werror("WARNING: MALFORMED ZIP ARCHIVE\n");
-			mapping files = ([]);
-			while (sizeof(buf)) {
-				[int minver, int flags, int comp, int ignore, int compsz, int decompsz, int fnlen, int xtralen] = buf->sscanf("%-2c%-2c%-2c%-8c%-4c%-4c%-2c%-2c");
-				string fn = buf->read(fnlen);
-				string xtra = buf->read(xtralen);
-				string raw = buf->read(compsz);
-				string decomp = Gz.inflate(-15)->inflate(raw);
-				//assert sizeof(decomp) == decompsz
-				files[fn] = decomp;
-				if (buf->read(4) != "PK\3\4") break; //After all files, there's a "PK\1\2" central directory, which we don't need
-			}
-			//Note that we have to read both files before we can parse, as the string_lookup is generally
-			//placed *after* the gamestate. No big deal as we have to have it all in memory anyway.
-			buf = Stdio.Buffer(files->string_lookup); buf->read_only();
-			[int unk1, int count, int unk3] = buf->sscanf("%c%-2c%-2c");
-			while (sizeof(buf)) string_lookup += buf->sscanf("%-2H");
-			//Stdio.File str = Stdio.File("string_lookup", "wct"); foreach (string_lookup; int i; string s) str->write("%04x: %s\n", i, s);
-			//Sweet. Now we can switch out to the compressed game state.
-			buf = Stdio.Buffer(files->gamestate); buf->read_only();
-			werror("Switching to compressed gamestate, %d bytes.\n", sizeof(buf));
-			id_sequence = ({ });
-			continue;
-		}
 		mixed value;
 		switch (id) {
 			case 0x0003:
@@ -311,24 +280,53 @@ int main() {
 	foreach ((Stdio.read_file("eu5textid.dat") || "") / "\n", string line)
 		if (sscanf(line, "#%x %s", int id, string str) && str != "") id_to_string[id] = str;
 	string path = "/mnt/sata-ssd/.steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
-	string data = Stdio.read_file(path + "/SP_TUR_1337_04_01_907a8a9e-6b68-45d2-9a68-89b2a7381a64.eu5");
+	string data = Stdio.read_file(path + "/SP_JAP_1337_04_01_f3c5fd0a-f5b1-4573-96b7-2362abc48265.eu5");
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
 	[string header] = buf->sscanf("%s\n");
 	if (header[..2] != "SAV") exit(1, "Not an EU5 save file\n");
 	//If any of these assertions fails, we probably need to make this parser more flexible.
 	//They will very likely indicate that changes are needed elsewhere.
-	if (header[3..4] != "02") exit(1, "Bad version %O\n", header[3..4]);
-	if (header[5..6] == "00") exit(1, "TODO: Support debug-mode saves too\n");
-	if (header[5..6] != "03") exit(1, "Bad type %O\n", header[5..6]);
-	if (header[15..18] != "0006") exit(1, "Bad type %O\n", header[15..18]);
-	if (header[23..] != "00000000") exit(1, "Bad end-of-header %O\n", header[23..]);
+	sscanf(header, "SAV%2x%2x%*8x%8x%8x", int version, int type, int metasize, int padding);
+	if (version != 2) exit(1, "Bad version %O\n", header[3..4]);
+	if (type == 0) exit(1, "TODO: Support text saves too\n");
+	else if (type != 3) exit(1, "Unsupported type %O\n", header[5..6]);
+	if (padding) exit(1, "Nonzeropadding %O\n", header[23..]);
+
+	if (type == 3) {
+		//Currently the only type supported - compressed binary.
+		//Skip the uncompressed metadata block, as it's duplicated into the compressed content.
+		buf->consume(metasize);
+		if (buf->read(4) != "PK\3\4") exit(1, "Malformed compressed savefile\n");
+		//Pike comes with a Filesystem.Zip interface but it's not really optimized for this
+		//sort of job, so instead we do our own parsing.
+		mapping files = ([]);
+		while (sizeof(buf)) {
+			[int minver, int flags, int comp, int ignore, int compsz, int decompsz, int fnlen, int xtralen] = buf->sscanf("%-2c%-2c%-2c%-8c%-4c%-4c%-2c%-2c");
+			string fn = buf->read(fnlen);
+			string xtra = buf->read(xtralen);
+			string raw = buf->read(compsz);
+			string decomp = Gz.inflate(-15)->inflate(raw);
+			//assert sizeof(decomp) == decompsz
+			files[fn] = decomp;
+			if (buf->read(4) != "PK\3\4") break; //After all files, there's a "PK\1\2" central directory, which we don't need
+		}
+		//Note that we have to read both files before we can parse, as the string_lookup is generally
+		//placed *after* the gamestate. No big deal as we have to have it all in memory anyway.
+		buf = Stdio.Buffer(files->string_lookup); buf->read_only();
+		[int unk1, int count, int unk3] = buf->sscanf("%c%-2c%-2c");
+		while (sizeof(buf)) string_lookup += buf->sscanf("%-2H");
+		//Stdio.File str = Stdio.File("string_lookup", "wct"); foreach (string_lookup; int i; string s) str->write("%04x: %s\n", i, s);
+		//Sweet. Now we can switch out to the compressed game state.
+		buf = Stdio.Buffer(files->gamestate); buf->read_only();
+	}
+
 	mapping toplevel = read_maparray(buf, "base");
 	//toplevel->metadata->compatibility->locations = toplevel->metadata->flag = "(...)";
 	werror("Toplevel: %t %O\n", toplevel, indices(toplevel));
 	if (!unknownids) return 0; //Yay!
 	//exit(0, "Got %d IDs.\n", sizeof(id_sequence));
 	//If we have a matching text save, try to match the keys.
-	data = Stdio.read_file(path + "/SP_TUR_1337_04_01_907a8a9e-6b68-45d2-9a68-89b2a7381a64_0.eu5");
+	data = Stdio.read_file(path + "/SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_1.eu5");
 	buf = Stdio.Buffer(data); buf->read_only();
 	buf->sscanf("%s\n");
 	array string_sequence = list_strings(buf);
