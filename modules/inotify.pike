@@ -224,8 +224,6 @@ void detect_save_move(int event, int cookie, string path) {
 		case System.Inotify.IN_MOVED_TO: if (cookie == nomnomcookie) {
 			nomnomcookie = 0;
 			foreach (SAVE_MOVE_PATHS; string pfx; string cat) if (has_prefix(path, pfx)) {
-				werror("Got a save-move for cat %O\n", cat);
-				werror("Hooks: %O\n", G->G->inotify_hooks);
 				foreach (values(G->G->inotify_hooks), function hook)
 					if (mixed ex = catch (hook(cat, path)))
 						werror("Unhandled exception in %s hook %O\n%s\n", cat, path, describe_backtrace(ex));

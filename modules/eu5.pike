@@ -5,4 +5,4 @@ void load_savefile(string fn) {
 	//TODO
 }
 
-@inotify_hook: void savefile_changed(string cat, string fn) {if (cat == "eu4") load_savefile(fn);}
+@inotify_hook: void savefile_changed(string cat, string fn) {if (cat == "eu5") load_savefile(fn);}
