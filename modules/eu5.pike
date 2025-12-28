@@ -148,6 +148,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path, mapping xtra) {
 
 mapping eu5_parse_savefile(string fn) {
 	string data = Stdio.read_file(EU5_SAVE_PATH + "/" + fn);
+	if (!data) return (["error": "Unable to read file"]);
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
 	[string header] = buf->sscanf("%s\n");
 	if (header[..2] != "SAV") return (["error": "Not an EU5 save file"]);
@@ -187,7 +188,7 @@ mapping eu5_parse_savefile(string fn) {
 		//Sweet. Now we can switch out to the compressed game state.
 		buf = Stdio.Buffer(files->gamestate); buf->read_only();
 	}
-	mapping xtra = (["string_lookup": string_lookup]);
+	mapping xtra = (["string_lookup": string_lookup, "last_string": "(none)"]);
 	xtra->savefile = read_maparray(buf, "base", xtra);
 	return xtra;
 }
