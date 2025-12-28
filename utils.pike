@@ -120,6 +120,189 @@ void counter() {
 	}
 }
 
+@"Pair-parse two EU5 savefiles to compare binary and text":
+void compareeu5() {
+	//TODO: Parameterize with the file names
+	object eu5 = G->bootstrap("modules/eu5.pike");
+	mapping xtra = eu5->eu5_parse_savefile("SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_0.eu5");
+	mapping savefile = xtra->savefile;
+	//savefile->metadata->compatibility->locations = savefile->metadata->flag = "(...)";
+	werror("Toplevel: %t %O\n", savefile, indices(savefile));
+	if (!xtra->unknownids) return 0; //Yay!
+
+	//If we have a matching text save, try to match the keys.
+	array string_sequence = eu5->list_strings("SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_1.eu5");
+	array id_sequence = xtra->id_sequence;
+	werror("Got %d IDs and %d strings; %d unknown IDs.\n", sizeof(id_sequence), sizeof(string_sequence), xtra->unknownids);
+
+	//Attempt to diff the two arrays.
+	//In the id sequence, anything beginning with a hash (eg "#3206") is incomparable.
+	//What we ideally want to see is something like:
+	//	ID		String		Meaning
+	//	"country"	"country"	Synchronized
+	//	"1183"		"1183"		Synchronized
+	//	"#2cf1"		"road_network"	Candidate!
+	//	"#3802"		"roads"		Candidate!
+	//	"#0528"		"from"		Candidate!
+	//	"1"		"1"		Resync!
+	//What we DON'T want to see is two strings that aren't the same. Example:
+	//	ID		String		Meaning
+	//	"save_label"	"save_label"	Synchronized
+	//	"Autosave"	"1464.5.18.16"	DESYNC
+	//	"version"	"version"	Resync
+	//This immediately calls into question everything around it. Ideally, we should see
+	//multiple synchronization pairs before and after any candidates; these are described
+	//as the candidacy quality, given as a pair of numbers (eg "2-1" if the country->1
+	//sequence were the entire file).
+	int nextid = 0, nextstr = 0;
+	array blocks = ({ }), matches = ({ });
+	//Elephant in Cairo: Trigger mismatch detection at the very end so that a final block can be detected.
+	id_sequence += ({"id_sequence"}); string_sequence += ({"string_sequence"});
+	int have_candidate = 0;
+	while (nextid < sizeof(id_sequence) && nextstr < sizeof(string_sequence)) {
+		string id = id_sequence[nextid], str = string_sequence[nextstr];
+		//write("Compare [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
+		werror("Comparing... %.1f%%...\r", nextid * 100.0 / sizeof(id_sequence));
+		if (id == str || id[0] == '#' || id == (string)((int)str * 100000) || id == (string)((int)str + (1<<32))) {
+			//Could be a match, or a candidate! Hang onto it for future analysis.
+			//Note that we consider "4500000" equal to "45" as we are currently
+			//unable to determine which integers represent fixed point and which
+			//are as-is. Similarly for signed/unsigned numbers.
+			matches += ({({id, str})});
+			++nextid; ++nextstr;
+			if (id[0] == '#') have_candidate = 1;
+		} else {
+			//We have a mismatch.
+			if (sizeof(matches)) {
+				//if (have_candidate) foreach (matches[..<10], [string i, string s]) write("\e[%dm%30s | %s\e[0m\n", i != s, i, s);
+				//if (have_candidate) exit(0, "Now have %O %O\n", id, str);
+				have_candidate = 0;
+				//Desynchronization after candidates and/or synchronization. Save the current block,
+				//but exclude any candidates on the outside of it - we want something surrounded by
+				//synchronization points.
+				int start = 0;
+				while (start < sizeof(matches) && matches[start][0][0] == '#') ++start;
+				if (start < sizeof(matches)) {
+					//(if it isn't, there weren't any matches, just a series of incomparables between
+					//two desynchronizations)
+					int end = sizeof(matches) - 1; //Inclusive-inclusive indexing since that's how Pike slices
+					while (matches[end][0][0] == '#') --end; //Guaranteed to terminate; there must be at least one synchronization.
+					//So, now that we've trimmed those off... are there any candidates in the middle?
+					int candidates = 0;
+					for (int i = start; i < end - 1; ++i)
+						candidates += (matches[i][0][0] == '#');
+					if (candidates) {
+						//Okay, we have at least one candidate; the quality is the number of sync points
+						//in the block. This isn't perfect, but it's something. Changing the quality
+						//algorithm would change prioritization but that's all.
+						blocks += ({([
+							"quality": end - start + 1 - candidates,
+							"candidates": candidates,
+							"strings": matches[start..end],
+						])});
+					}
+				}
+				matches = ({ });
+			}
+			//So. We need to scan forward in both arrays until we find a resync.
+			//Pretty simple algorithm here; this isn't always going to find the best diff but it's probably fine.
+			mapping idskip = ([]), strskip = ([]);
+			//First iteration of this loop looks at the same id/str as we already have, then we advance from there.
+			//write("DESYNC: [%d] %O to [%d] %O\n", nextid, id[..50], nextstr, str[..50]);
+			int found = 0;
+			void advance(int skipids, int skipstrs) {
+				//Activate this for manual review of every discrepancy that contains an unknown
+				if (0) foreach (id_sequence[nextid..nextid+skipids-1], string id) if (id[0] == '#') {
+					//If there's any ID with a hash in it, report the block.
+					write("- Mismatch, %d:%d -\e[K\n", skipids, skipstrs);
+					int i = -1;
+					for (; i < skipids || i < skipstrs; ++i)
+						write("%30s | %s\n",
+							i < skipids ? id_sequence[nextid + i] : "",
+							i < skipstrs ? string_sequence[nextstr + i] : "",
+						);
+					//And one line of context. In reality, the alignment may work better if the
+					//gap is somewhere other than immediately before the context line, but this
+					//will give at least some idea.
+					write("%30s | %s\n", id_sequence[nextid + skipids], string_sequence[nextstr + skipstrs]);
+					break;
+				}
+				nextid += skipids; nextstr += skipstrs; found = 1;
+			}
+			for (int skip = 0; nextid + skip < sizeof(id_sequence) && nextstr + skip < sizeof(string_sequence); ++skip) {
+				id = id_sequence[nextid + skip]; str = string_sequence[nextstr + skip];
+				//When skip is (say) 4, we've scanned 4 entries forward in each array.
+				//If there are matching entries in the two arrays within that distance, we take
+				//that and resume. Note that, as written here, we will try to keep the skip
+				//distances similar, rather than taking the earliest match. Ideally, we'd find
+				//multi-string matches, rather than accepting the first coincidence we meet.
+				if (id == str) {
+					//Activate this for manual review of single-line discrepancies, which
+					//could indicate that more flexible comparisons are needed.
+					if (0 && skip == 1) {
+						//We advanced one entry in each array and then found a rematch.
+						//This strongly suggests a one-string mismatch, which may well
+						//be of interest. Report it, with a little context.
+						write("- One-line mismatch block -\n");
+						write("%30s | %<s\n", id_sequence[nextid - 1]);
+						write("\e[1m%30s | %s\e[0m\n", id_sequence[nextid], string_sequence[nextstr]);
+						write("%30s | %<s\n", id);
+					}
+					advance(skip, skip);
+					break;
+				}
+				//if (id[0] == '#') werror("CHECKING/SKIPPING %O %O\n", id, str);
+				if (!undefinedp(idskip[str])) {advance(idskip[str], skip); break;}
+				if (!undefinedp(strskip[id])) {advance(skip, strskip[id]); break;}
+				idskip[id] = strskip[str] = skip;
+			}
+			/* else: */ if (!found) break; //If no resync point was found, we must have hit the end.
+		}
+	}
+	werror("Got %d candidacy blocks.\n", sizeof(blocks));
+	mapping sighted = ([]), quality = ([]);
+	foreach (blocks, mapping blk) {
+		write("- %d candidates at quality %d\n", blk->candidates, blk->quality);
+		multiset seen = (<>);
+		foreach (blk->strings, [string id, string str]) {
+			if (seen[id]) continue;
+			seen[id] = 1;
+			write("\e[%dm%30s | %s\e[0m\n", id != str, id, str); //If they match, it's a context line, not bold. If they're different, bold it.
+			if (id[0] == '#') {
+				if (sighted[id] && sighted[id] != str) {
+					sighted[id] += " :: " + str;
+					werror("MISMATCH: %O -> %O\n", id, sighted[id]);
+				} else {
+					sighted[id] = str;
+					quality[id] += blk->quality;
+				}
+			}
+		}
+	}
+	array can = ({ }), qual = ({ });
+	array keep = ({ });
+	//Merge in the current string table
+	foreach (eu5->id_to_string; int id; string str) if (str[0] != '#') {
+		sighted[sprintf("#%04x", id)] = str;
+		quality[sprintf("#%04x", id)] = 1<<30;
+	}
+	foreach (sighted; string id; string str) {
+		//Good ones get saved automatically
+		if (quality[id] >= 25) keep += ({({id, str})});
+		else {
+			//Less good ones get saved as candidates. After the ones with higher confidence
+			//get saved and used, they can provide context, which will increase quality of
+			//others. (That might not actually be a good thing though...)
+			can += ({sprintf("%s: [%d] %s\n", id, quality[id], str)});
+			qual += ({-quality[id]});
+		}
+	}
+	sort(qual, can);
+	if (sizeof(can)) Stdio.write_file("candidates.txt", can * "");
+	sort(keep[*][0], keep);
+	Stdio.write_file("eu5textid.dat", sprintf("%{%s %s\n%}", keep));
+}
+
 @"Edited as needed, does what's needed":
 void test() {
 	trace_on_signal();
