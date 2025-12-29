@@ -148,7 +148,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path, mapping xtra) {
 }
 
 mapping eu5_parse_savefile(string fn) {
-	string data = Stdio.read_file(EU5_SAVE_PATH + "/" + fn);
+	string data = Stdio.read_file(fn);
 	if (!data) return (["error": "Unable to read file"]);
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();
 	[string header] = buf->sscanf("%s\n");
@@ -194,10 +194,16 @@ mapping eu5_parse_savefile(string fn) {
 	return xtra;
 }
 
-@inotify_hook: void savefile_changed(string cat, string fn) {if (cat == "eu5") eu5_parse_savefile(fn);}
+@inotify_hook: void savefile_changed(string cat, string fn) {
+	if (cat == "eu5") {
+		G->G->last_parsed_eu5_savefile = eu5_parse_savefile(fn);
+		object handler = G->G->websocket_types->eu5;
+		foreach (handler->websocket_groups; mixed grp;) handler->send_updates_all(grp);
+	}
+}
 
 array list_strings(string fn) {
-	Stdio.Buffer buf = Stdio.Buffer(Stdio.read_file(EU5_SAVE_PATH + "/" + fn));
+	Stdio.Buffer buf = Stdio.Buffer(Stdio.read_file(fn));
 	buf->read_only();
 	buf->sscanf("%s\n");
 	array strings = ({ });
