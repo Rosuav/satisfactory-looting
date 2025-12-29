@@ -124,10 +124,12 @@ void counter() {
 void compareeu5() {
 	//TODO: Parameterize with the file names
 	object eu5 = G->bootstrap("modules/eu5.pike");
-	mapping xtra = eu5->eu5_parse_savefile("SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_0.eu5");
+	mapping xtra = eu5->eu5_parse_savefile("MP_NAP_1337_04_01_b326c512-61cf-4b03-b140-3ada8ec1200f.eu5");
 	mapping savefile = xtra->savefile;
-	//savefile->metadata->compatibility->locations = savefile->metadata->flag = "(...)";
-	werror("Toplevel: %t %O\n", savefile, indices(savefile));
+	savefile->metadata->compatibility->locations = savefile->metadata->flag = "(...)";
+	//savefile->played_country might need to be arrayified, but then should make the lookup of
+	//username to nation possible.
+	werror("Players: %O\n", savefile->played_country);
 	if (!xtra->unknownids) return 0; //Yay!
 
 	//If we have a matching text save, try to match the keys.
