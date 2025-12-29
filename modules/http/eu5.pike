@@ -54,8 +54,16 @@ mapping get_state(string group) {
 
 	return ([
 		"name": group + " (" + country->country_name + ")", //TODO: L10N this
+		"date": eu5_date_to_string(data->metadata->date),
 		"automated_systems": country->automated_systems, //TODO: Provide recommendations
 		"bgcolor": sprintf("#%02x%02x%02x", @country->color),
 		"self": stringify_keys(country),
 	]);
 }
+
+/* Next steps
+* Localization file loading. There's a lot of them, and a lot of useful info buried in there.
+* Flags! More complicated than in EU4, and non-constant.
+* Player menu. Need to get a savefile with multiple actual players in it.
+* Actual analysis and recommendations!
+*/

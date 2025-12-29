@@ -4,7 +4,7 @@ inherit annotated;
 mapping(int:string) id_to_string = ([]);
 
 mapping(int:string) idx_to_date = ([]); //Convenience lookup - 0 maps to "1.1" for Jan 1st, 364 maps to "12.31"
-string date_to_string(int date) {
+@export: string eu5_date_to_string(int date) {
 	int hour = date % 24; date /= 24;
 	int year = date / 365 - 5000; date %= 365;
 	string d = sprintf("%d.%s", year, idx_to_date[date]);
@@ -16,7 +16,7 @@ string date_to_string(int date) {
 //January is -1 since day values are 1-based but integers are 0-based.
 //And there's a shim because month values are also 1-based (we'll never look up month 0).
 array(int) month_offset = ({0, -1});
-int date_to_int(int y, int m, int d, int h) {
+@export: int eu5_date_to_int(int y, int m, int d, int h) {
 	return ((y + 5000) * 365 + month_offset[m] + d) * 24 + h;
 }
 
@@ -227,9 +227,9 @@ array list_strings(string fn) {
 			//recognize which fields in the binary should be treated as dates, so fold them all
 			//to numbers here.
 			if (sscanf(word[0], "%d.%d.%d.%d%s", int y, int m, int d, int h, string tail) && tail == "")
-				strings += ({(string)date_to_int(y, m, d, h)});
+				strings += ({(string)eu5_date_to_int(y, m, d, h)});
 			else if (sscanf(word[0], "%d.%d.%d%s", int y, int m, int d, string tail) && tail == "")
-				strings += ({(string)date_to_int(y, m, d, 0)});
+				strings += ({(string)eu5_date_to_int(y, m, d, 0)});
 			//For best results, transform "123.456" into "12345600" to match the fixed-place handling in binary
 			else if (sscanf(word[0], "%d.%[0-9]%s", int before, string after, string tail) && tail == "") {
 				if (sizeof(after) != 5) after = (after + "00000")[..4];
