@@ -181,6 +181,7 @@
 #2a2a existence
 #2a35 dynasties
 #2a44 map
+#2a8b topography
 #2a9d current
 #2acf dna
 #2adf ai
@@ -954,6 +955,7 @@
 #3be2 important
 #3be7 chase_retreating
 #3bea building_candidates
+#3beb non_engaged
 #3c00 last_leader
 #3cbf ai_cabinet_dirty
 #3cc9 wealth_impact
