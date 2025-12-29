@@ -28,6 +28,20 @@ int group_to_country(mapping data, string tag) {
 	return -1;
 }
 
+//JSON can't handle non-string keys, but there are a lot of integer keys in the save file.
+mapping stringify_keys(mapping data) {
+	if (!mappingp(data)) return data;
+	mapping ret = ([]);
+	foreach (data; mixed key; mixed val) {
+		if (intp(key)) key = (string)key;
+		else if (!stringp(key)) key = "<unknown type>"; //What to do about collisions?
+		if (arrayp(val)) val = stringify_keys(val[*]);
+		else if (mappingp(val)) val = stringify_keys(val);
+		ret[key] = val;
+	}
+	return ret;
+}
+
 mapping get_state(string group) {
 	mapping data = G->G->last_parsed_eu5_savefile;
 	if (!data) return (["error": "Processing savefile... "]);
@@ -38,5 +52,5 @@ mapping get_state(string group) {
 	mapping country = data->countries->database[group_to_country(data, group)];
 	if (!country) return (["error": "Country/player not found: " + group]);
 
-	return (["hello": "world"]);
+	return (["hello": "world", "self": stringify_keys(country)]);
 }
