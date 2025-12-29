@@ -124,7 +124,7 @@ void counter() {
 void compareeu5() {
 	//TODO: Parameterize with the file names
 	object eu5 = G->bootstrap("modules/eu5.pike");
-	mapping xtra = eu5->eu5_parse_savefile(EU5_SAVE_PATH + "/" + "MP_NAP_1337_04_01_b326c512-61cf-4b03-b140-3ada8ec1200f.eu5");
+	mapping xtra = eu5->eu5_parse_savefile(EU5_SAVE_PATH + "/" + "SP_BYZ_1337_04_03_ba36c932-4c56-4b5c-aa68-d6cfde89564f.eu5");
 	mapping savefile = xtra->savefile;
 	savefile->metadata->compatibility->locations = savefile->metadata->flag = "(...)";
 	//savefile->played_country might need to be arrayified, but then should make the lookup of
@@ -133,7 +133,7 @@ void compareeu5() {
 	if (!xtra->unknownids) return 0; //Yay!
 
 	//If we have a matching text save, try to match the keys.
-	array string_sequence = eu5->list_strings(EU5_SAVE_PATH + "/" + "SP_HOL_1337_04_01_1509e222-7267-4984-9c47-3071f89972ca_1.eu5");
+	array string_sequence = eu5->list_strings(EU5_SAVE_PATH + "/" + "SP_BYZ_1337_04_03_ba36c932-4c56-4b5c-aa68-d6cfde89564f_0.eu5");
 	array id_sequence = xtra->id_sequence;
 	werror("Got %d IDs and %d strings; %d unknown IDs.\n", sizeof(id_sequence), sizeof(string_sequence), xtra->unknownids);
 

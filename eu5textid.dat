@@ -921,6 +921,7 @@
 #3a3b prev_game_rules
 #3a3e occupied_locations
 #3a40 monthly_trade_value
+#3a44 supply_weight
 #3a46 upkeep
 #3a54 location_ancient
 #3b45 last_months_sailor_expense
@@ -968,3 +969,4 @@
 #3d12 locations_with_this_as_raw_material
 #3d24 war_score_is_relevant
 #3d26 has_come_of_age
+#3d2e target_character
