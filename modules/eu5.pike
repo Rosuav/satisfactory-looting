@@ -92,7 +92,8 @@ mapping|array read_maparray(Stdio.Buffer buf, string path, mapping xtra) {
 			case 0x0d4a: [value] = buf->sscanf("%-3c"); break; //Guessing based on the surroundings
 			case 0x0d4b: [value] = buf->sscanf("%-4c"); break; //that these two will be 3-byte and 4-bytes
 			case 0x0d4c: [value] = buf->sscanf("%-5c"); break;
-			case 0x0d4d: case 0x0d4e: werror("[%d] GOT %04x at pos %d, NEXT%{ %02x%}\n", startpos, id, pos, (array)(string)buf[..9]); break; //Might be looking for six and seven bytes respectively
+			case 0x0d4d: [value] = buf->sscanf("%-6c"); break;
+			case 0x0d4e: [value] = buf->sscanf("%-7c"); break;
 			case 0x0d4f: [value] = buf->sscanf("%-1c"); value = -value; break; //Small negative values???
 			case 0x0d50: [value] = buf->sscanf("%-2c"); value = -value; break; //There isn't room for an eight byte here but maybe that's just 0167
 			case 0x0d51: [value] = buf->sscanf("%-3c"); value = -value; break;
