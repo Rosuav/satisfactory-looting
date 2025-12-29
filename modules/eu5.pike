@@ -135,6 +135,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path, mapping xtra) {
 			if (trace == 2) werror("| Recording key %O\n", lastobj);
 		}
 	}
+	if (mode == MODE_GOTOBJ) arr += ({lastobj});
 	if (sizeof(map) && sizeof(arr)) {
 		//werror("WARNING: Mixed map/array at pos %d %s\n%O\n%O\n", startpos, path, map, arr);
 		//For now, stick the two parts together; array first, then mapping entries as pairs
