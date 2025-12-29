@@ -15,9 +15,10 @@ function section(id, nav, lbl, render) {sections.push({id, nav, lbl, render});}
 
 let max_interesting = { };
 
-section("hello", "Example", "Example Section", state => [
-	SUMMARY("Example Section"),
-	P("Hello, world!"),
+section("automated_systems", "Automation", "Automated Systems", state => [
+	SUMMARY("Automated Systems"),
+	P("TODO: Provide some recommendations"),
+	UL(state.automated_systems.map(kwd => LI(kwd))),
 ]);
 
 //function threeplace(n) {return (n / 1000).toFixed(2);} //Might need a fiveplace()?
@@ -38,7 +39,7 @@ export function render(state) {
 		]),
 		DIV({id: "error", className: "hidden"}),
 		DIV({id: "menu", className: "hidden"}),
-		IMG({className: "flag large", id: "playerflag", alt: "[flag of player's nation]"}),
+		DIV({id: "flagbg"}, IMG({className: "flag large", id: "playerflag", alt: "[flag of player's nation]"})),
 		H1({id: "player"}),
 		sections.map(s => DETAILS({id: s.id}, SUMMARY(s.lbl))),
 		DIV({id: "options"}, [ //Positioned fixed in the top corner
@@ -57,6 +58,7 @@ export function render(state) {
 	}
 	replace_content("#error", "").classList.add("hidden");
 	if (state.name) replace_content("#player", state.name);
+	if (state.bgcolor) DOM("#flagbg").style.background = state.bgcolor;
 	sections.forEach(s => state[s.id] && replace_content("#" + s.id, s.render(state)));
 	const is_interesting = [];
 	Object.entries(max_interesting).forEach(([id, lvl]) => {

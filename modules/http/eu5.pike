@@ -52,5 +52,10 @@ mapping get_state(string group) {
 	mapping country = data->countries->database[group_to_country(data, group)];
 	if (!country) return (["error": "Country/player not found: " + group]);
 
-	return (["hello": "world", "self": stringify_keys(country)]);
+	return ([
+		"name": group + " (" + country->country_name + ")", //TODO: L10N this
+		"automated_systems": country->automated_systems, //TODO: Provide recommendations
+		"bgcolor": sprintf("#%02x%02x%02x", @country->color),
+		"self": stringify_keys(country),
+	]);
 }
