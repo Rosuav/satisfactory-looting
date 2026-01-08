@@ -317,8 +317,23 @@ void compareeu5() {
 	Stdio.write_file("eu5textid.dat", sprintf("%{%s %s\n%}", keep));
 }
 
+@"Search EU5 localization":
+void eu5l10n() {
+	//Three stage search: First try for an exact match, then a substring, then a case-insensitive substring.
+	if (!sizeof(G->G->args[Arg.REST])) exit(1, "Search for what?\n");
+	string findme = G->G->args[Arg.REST][0];
+	if (string xlat = G->G->EU5_L10N[findme]) exit(0, "Exact match: %s\n", xlat);
+	int found = 0;
+	foreach (G->G->EU5_L10N; string key; string xlat)
+		if (has_value(key, findme)) {write("%s: %s\n", key, xlat); ++found;}
+	if (found) exit(0, "%d matches found.\n");
+	foreach (G->G->EU5_L10N; string key; string xlat)
+		if (has_value(lower_case(key), lower_case(findme))) write("%s: %s\n", key, xlat);
+	write("%d case insensitive matches found.\n");
+}
+
 @"Edited as needed, does what's needed":
 void test() {
 	trace_on_signal();
-	write("%s\n", string_to_utf8(G->G->EU5_L10N->ENG));
+	//Add code as needed
 }
