@@ -200,7 +200,9 @@ mapping eu5_parse_savefile(string fn) {
 
 @inotify_hook: void savefile_changed(string cat, string fn) {
 	if (cat == "eu5") {
-		G->G->last_parsed_eu5_savefile = eu5_parse_savefile(fn);
+		mapping data = G->G->last_parsed_eu5_savefile = eu5_parse_savefile(fn);
+		mapping meta = data->savefile->?metadata || ([]);
+		write("Loaded EU5 save: %s %O\n", meta->player_country_name || "(??)", meta->date);
 		object handler = G->G->websocket_types->eu5;
 		foreach (handler->websocket_groups; mixed grp;) handler->send_updates_all(grp);
 	}
