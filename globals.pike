@@ -5,6 +5,7 @@ protected void create(string n)
 		if (stringp(anno) && sscanf(anno, "G->G->%s", string gl) && gl)
 			if (!G->G[gl]) G->G[gl] = ([]);
 	load_satisfactory_l10n("en-US");
+	load_eu5_l10n("english");
 }
 
 //TODO: Figure out a way to ask Steam where a game is installed, and what the active user is
@@ -13,6 +14,7 @@ constant SATIS_PROGRAM_PATH = "../.steam/steamapps/common/Satisfactory";
 constant EU4_LOCAL_PATH = "../.local/share/Paradox Interactive/Europa Universalis IV";
 //constant EU4_SAVE_PATH = LOCAL_PATH + "/save games"; //Not actually a constant
 constant EU4_PROGRAM_PATH = "../.steam/steam/steamapps/common/Europa Universalis IV"; //Append /map or /common etc to access useful data files
+constant EU5_PROGRAM_PATH = "../.steam/steam/steamapps/common/Europa Universalis V";
 constant EU5_SAVE_PATH = "../.steam/steam/steamapps/compatdata/3450310/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Europa Universalis V/save games";
 
 constant CONFIG_FILE = "preferences.json";
@@ -54,6 +56,31 @@ void load_satisfactory_l10n(string lang) {
 string L10n(string id) {
 	if (!G->G->satis_l10n) load_satisfactory_l10n("en-US");
 	return G->G->satis_l10n[id] || id;
+}
+
+//Simplified YAML parsing. Seems enough to handle EU4/EU5 localization files.
+void parse_localisation(string data, mapping L10n) {
+	array lines = utf8_to_string("#" + data) / "\n"; //Hack: Pretend that the heading line is a comment
+	foreach (lines, string line) {
+		sscanf(line, "%s#", line);
+		sscanf(line, " %s:%*[0-9 ]\"%s\"", string key, string val);
+		if (key && val) L10n[key] = val;
+	}
+}
+
+void l10n_scan_dir(string dir, mapping xlat) {
+	foreach (sort(get_dir(dir) || ({ })), string fn) {
+		string path = dir + "/" + fn;
+		if (file_stat(path)->isdir) l10n_scan_dir(path, xlat);
+		else parse_localisation(Stdio.read_file(path), xlat);
+	}
+}
+
+void load_eu5_l10n(string lang) {
+	mapping xlat = ([]);
+	foreach (sort(get_dir(EU5_PROGRAM_PATH + "/game")), string section)
+		l10n_scan_dir(EU5_PROGRAM_PATH + "/game/" + section + "/localization/" + lang, xlat);
+	G->G->EU5_L10N = xlat;
 }
 
 //Handle potentially-asynchronous results. Can be used to paper over a distinction between

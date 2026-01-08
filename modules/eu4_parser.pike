@@ -292,14 +292,6 @@ class GameConfig {
 
 	mapping(string:string) L10n = ([]);
 	mapping(string:array) province_localised_names = ([]);
-	void parse_localisation(string data) {
-		array lines = utf8_to_string("#" + data) / "\n"; //Hack: Pretend that the heading line is a comment
-		foreach (lines, string line) {
-			sscanf(line, "%s#", line);
-			sscanf(line, " %s:%*[0-9 ]\"%s\"", string key, string val);
-			if (key && val) L10n[key] = val;
-		}
-	}
 
 	string gather_province_info() {
 		/* It is REALLY REALLY hard to replicate the game's full algorithm for figuring out which terrain each province
@@ -419,7 +411,7 @@ log = \"PROV-TERRAIN-END: requested at " + time() + #"\"
 		//Note that caching of l10n files has been dropped; ultimately, this entire GameConfig could be cached.
 		foreach (config_dirs, string dir)
 			foreach (glob("*_l_english.yml", get_dir(dir + "/localisation") || ({ })), string fn)
-				parse_localisation(Stdio.read_file(dir + "/localisation/" + fn));
+				parse_localisation(Stdio.read_file(dir + "/localisation/" + fn), L10n);
 		map_areas = low_parse_savefile("/map/area.txt");
 		foreach (map_areas; string areaname; array|maparray provinces) {
 			foreach (provinces;; string id) prov_area[id] = areaname;
