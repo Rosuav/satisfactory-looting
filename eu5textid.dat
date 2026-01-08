@@ -210,6 +210,7 @@
 #2c7c cached
 #2c8f last
 #2ca2 names
+#2caa vegetation
 #2cc5 dirty
 #2cc6 country_name
 #2cc8 custom_name
@@ -703,6 +704,7 @@
 #35ff implemented_reforms
 #3600 implemented_laws
 #3601 implemented_government_action
+#3604 bias_type
 #3606 supplied
 #3608 demanded
 #3609 taken
@@ -883,6 +885,7 @@
 #38b8 has_rite_power
 #38bb intervention_satisfaction
 #38bc minting_efficiency
+#38c2 danger
 #38cb cap_control
 #38ce use_icons
 #38db parliament
@@ -972,3 +975,4 @@
 #3d24 war_score_is_relevant
 #3d26 has_come_of_age
 #3d2e target_character
+#3d8b siege_status
