@@ -40,6 +40,7 @@
 #01a3 repeat
 #01b6 entity
 #01b7 state
+#01b8 event
 #01be chance
 #01cf tags
 #020c index
@@ -127,6 +128,7 @@
 #275a building
 #277f first
 #27d2 province
+#27d3 player_event
 #27d8 tag
 #27e2 county
 #27e9 birth
