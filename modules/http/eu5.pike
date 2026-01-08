@@ -56,7 +56,7 @@ mapping get_state(string group) {
 	return ([
 		"name": group + " (" + L10n(country->country_name) + ")",
 		"date": eu5_date_to_string(data->metadata->date),
-		"automated_systems": country->automated_systems, //TODO: Provide recommendations
+		"automated_systems": L10n(("AUTOMATED_SYSTEM_" + upper_case(country->automated_systems[*])[*])[*]), //TODO: Provide recommendations?
 		"bgcolor": sprintf("#%02x%02x%02x", @country->color),
 		"self": stringify_keys(country),
 	]);
@@ -66,6 +66,7 @@ protected void create(string name) {::create(name);}
 
 /* Next steps
 * Flags! More complicated than in EU4, and non-constant.
+  - A flag is derived from a Coat of Arms [coa] and there's a lot of flexibility in each layer.
 * Player menu. Need to get a savefile with multiple actual players in it.
 * Actual analysis and recommendations!
 */
