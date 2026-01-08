@@ -322,14 +322,14 @@ void eu5l10n() {
 	//Three stage search: First try for an exact match, then a substring, then a case-insensitive substring.
 	if (!sizeof(G->G->args[Arg.REST])) exit(1, "Search for what?\n");
 	string findme = G->G->args[Arg.REST][0];
-	if (string xlat = G->G->EU5_L10N[findme]) exit(0, "Exact match: %s\n", xlat);
+	if (string xlat = G->G->EU5_L10N[findme]) exit(0, "Exact match: %s\n", string_to_utf8(xlat));
 	int found = 0;
 	foreach (G->G->EU5_L10N; string key; string xlat)
-		if (has_value(key, findme)) {write("%s: %s\n", key, xlat); ++found;}
-	if (found) exit(0, "%d matches found.\n");
+		if (has_value(key, findme)) {write("%s: %s\n", key, string_to_utf8(xlat)); ++found;}
+	if (found) exit(0, "%d matches found.\n", found);
 	foreach (G->G->EU5_L10N; string key; string xlat)
-		if (has_value(lower_case(key), lower_case(findme))) write("%s: %s\n", key, xlat);
-	write("%d case insensitive matches found.\n");
+		if (has_value(lower_case(key), lower_case(findme))) write("%s: %s\n", key, string_to_utf8(xlat));
+	write("%d case insensitive matches found.\n", found);
 }
 
 @"Edited as needed, does what's needed":
