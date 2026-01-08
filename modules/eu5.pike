@@ -98,7 +98,10 @@ mapping|array read_maparray(Stdio.Buffer buf, string path, mapping xtra) {
 			case 0x0d50: [value] = buf->sscanf("%-2c"); value = -value; break; //There isn't room for an eight byte here but maybe that's just 0167
 			case 0x0d51: [value] = buf->sscanf("%-3c"); value = -value; break;
 			case 0x0d52: [value] = buf->sscanf("%-4c"); value = -value; break;
-			case 0x0d53..0x0d56: werror("[%d] GOT %04x at pos %d, NEXT%{ %02x%}\n", startpos, id, pos, (array)(string)buf[..9]); break; //Might be looking for six and seven bytes respectively
+			case 0x0d53: [value] = buf->sscanf("%-5c"); value = -value; break;
+			case 0x0d54: [value] = buf->sscanf("%-6c"); value = -value; break;
+			case 0x0d55: [value] = buf->sscanf("%-7c"); value = -value; break;
+			case 0x0d56: werror("[%d] GOT %04x at pos %d, NEXT%{ %02x%}\n", startpos, id, pos, (array)(string)buf[..9]); break; //Might be looking for six and seven bytes respectively
 			//Lookups into the strings table come in short and long forms. Is it possible for there to be >65535 strings?
 			case 0x0d43: //Unsure what is going on here; seems to be the same as 0d40??
 			case 0x0d40: value = xtra->last_string = xtra->string_lookup[buf->read_int8()]; break;
