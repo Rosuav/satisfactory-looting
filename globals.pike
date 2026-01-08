@@ -329,6 +329,9 @@ class L10n_EU4 {
 	string L10N(string key) {return G->CFG->L10n[key] || key;} //Deprecated
 	string L10n(string key) {return G->CFG->L10n[key] || key;} //Preferred
 }
+class L10n_EU5 {
+	string L10n(string key) {return G->G->EU5_L10N[key] || key;}
+}
 
 int threeplace(string value) {
 	//EU4 uses three-place fixed-point for a lot of things. Return the number as an integer,

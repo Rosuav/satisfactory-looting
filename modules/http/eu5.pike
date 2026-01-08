@@ -1,4 +1,5 @@
 inherit http_websocket;
+inherit L10n_EU5;
 
 constant http_path_pattern = "/eu5/%[^/]";
 
@@ -53,7 +54,7 @@ mapping get_state(string group) {
 	if (!country) return (["error": "Country/player not found: " + group]);
 
 	return ([
-		"name": group + " (" + country->country_name + ")", //TODO: L10N this
+		"name": group + " (" + L10n(country->country_name) + ")",
 		"date": eu5_date_to_string(data->metadata->date),
 		"automated_systems": country->automated_systems, //TODO: Provide recommendations
 		"bgcolor": sprintf("#%02x%02x%02x", @country->color),
@@ -61,8 +62,9 @@ mapping get_state(string group) {
 	]);
 }
 
+protected void create(string name) {::create(name);}
+
 /* Next steps
-* Localization file loading. There's a lot of them, and a lot of useful info buried in there.
 * Flags! More complicated than in EU4, and non-constant.
 * Player menu. Need to get a savefile with multiple actual players in it.
 * Actual analysis and recommendations!
