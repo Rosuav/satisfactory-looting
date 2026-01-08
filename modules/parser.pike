@@ -1,4 +1,5 @@
 inherit annotated;
+inherit L10n_Satisfactory;
 @retain: mapping(string:mapping(string:mixed)) parse_cache = ([]);
 constant CACHE_VALIDITY = 3; //Bump this number to invalidate older cache entries.
 
@@ -901,3 +902,5 @@ string reconstitute_savefile_body(int ver1, mapping tree) {
 	}
 	return (string)data;
 }
+
+protected void create(string name) {::create(name);}

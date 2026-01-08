@@ -6,6 +6,7 @@
 //Note that analyzing may mutate the savefile mapping, but only to cache information
 //that would not change without the savefile itself changing.
 inherit annotated;
+inherit L10n_EU4;
 
 void analyze_cot(mapping data, string name, string tag, mapping write) {
 	mapping country = data->countries[tag];
@@ -2480,3 +2481,5 @@ void analyze_states(mapping data, string tag, mapping write) {
 	analyze_states(data, tag, ret);
 	return ret;
 }
+
+protected void create(string name) {::create(name);}

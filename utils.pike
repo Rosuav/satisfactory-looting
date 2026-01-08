@@ -27,6 +27,7 @@ void walk(mixed tree, string path, function handler) {
 @"Dump out current hard drive library":
 void hd() {
 	object parser = G->bootstrap("modules/parser.pike");
+	function L10n = L10n_Satisfactory()->L10n;
 	mapping savefile = parser->low_parse_savefile(0);
 	array avail = ({ }), unclaimed = ({ });
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {

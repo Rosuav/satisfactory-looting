@@ -1,5 +1,6 @@
 inherit http_websocket;
 inherit annotated;
+inherit L10n_EU4;
 
 constant http_path_pattern = "/tag/%[^/]";
 

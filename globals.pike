@@ -53,11 +53,6 @@ void load_satisfactory_l10n(string lang) {
 	}
 }
 
-string L10n(string id) {
-	if (!G->G->satis_l10n) load_satisfactory_l10n("en-US");
-	return G->G->satis_l10n[id] || id;
-}
-
 //Simplified YAML parsing. Seems enough to handle EU4/EU5 localization files.
 void parse_localisation(string data, mapping L10n) {
 	array lines = utf8_to_string("#" + data) / "\n"; //Hack: Pretend that the heading line is a comment
@@ -326,9 +321,14 @@ object get_satisfactory_map() {
 	return Image.JPEG.decode(Stdio.read_file(mapfile));
 }
 
-//CAUTION: This function handles EU4 localisation, but L10n() - note the lowercase n - handles
-//Satisfactory localisation. TODO: Merge them.
-string L10N(string key) {return G->CFG->L10n[key] || key;}
+//Inherit one of these classes to make a localization function available.
+class L10n_Satisfactory {
+	string L10n(string key) {return G->G->satis_l10n[key] || key;}
+}
+class L10n_EU4 {
+	string L10N(string key) {return G->CFG->L10n[key] || key;} //Deprecated
+	string L10n(string key) {return G->CFG->L10n[key] || key;} //Preferred
+}
 
 int threeplace(string value) {
 	//EU4 uses three-place fixed-point for a lot of things. Return the number as an integer,
