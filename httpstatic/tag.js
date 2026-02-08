@@ -93,7 +93,7 @@ function cell_compare(sortcol, direction, is_numeric) { //direction s/be 1 or -1
 
 //To be functional, a sortable MUST have an ID. It may have other attrs.
 const sort_selections = { };
-function numeric_sort_header(h) {return (typeof h === "string" && h[0] === '#') || h?.dataset?.numeric;}
+function numeric_sort_header(h) {return (typeof h === "string" && h[0] === '#') || h?.dataset?.numeric || h?.attributes?.["data-numeric"];}
 function sortable(attrs, headings, rows) {
 	if (!attrs || !attrs.id) console.error("BAD SORTABLE, NEED ID", attrs, headings, rows);
 	if (typeof headings === "string") headings = headings.split(" ");
@@ -101,7 +101,7 @@ function sortable(attrs, headings, rows) {
 	const reverse = sortcol && sortcol[0] === '-'; //Note that this is done with strings; "-0" means "column zero but reversed".
 	if (reverse) sortcol = sortcol.slice(1);
 	const is_numeric = numeric_sort_header(headings[sortcol]);
-	const headrow = THEAD(TR(headings.map((h, i) => TH({class: "sorthead", "data-idx": i}, numeric_sort_header(h) ? h.slice(1) : h))));
+	const headrow = THEAD(TR(headings.map((h, i) => TH({class: "sorthead", "data-idx": i}, typeof h === "string" && h[0] === "#" ? h.slice(1) : h))));
 	rows.forEach((r, i) => r.key = r.key || "row-" + i);
 	if (sortcol !== undefined) rows.sort(cell_compare(sortcol, reverse ? -1 : 1, is_numeric));
 	const tb = DOM("#" + attrs.id);
@@ -605,12 +605,15 @@ section("badboy_hatred", "Badboy", "Aggressive Expansion (Badboy)", state => {
 			TD({class: info.opinion_theirs < 0 ? "interesting1" : ""}, info.opinion_theirs),
 			TD({class: hater.badboy >= 50000 ? "interesting1" : ""}, Math.floor(hater.badboy / 1000) + ""),
 			TD(Math.floor(hater.improved / 1000) + ""),
+			TD(+info.opinion_theirs + 100 - Math.floor(hater.improved / 1000) + ""),
 			TD(attr, COUNTRY(hater.tag)),
 			TD(attr, [
 				info.overlord && SPAN({title: "Is a " + info.subject_type + " of " + country_info[info.overlord].name}, "🙏"),
 				info.truce && SPAN({title: "Truce until " + info.truce}, "🏳"),
 				hater.in_coalition && SPAN({title: "In coalition against you!"}, "😠"),
 			]),
+			TD(attr, ""+hater.army),
+			TD(attr, ""+hater.manpower),
 		]);
 	});
 	max_interesting.badboy_hatred = have_coalition ? 2 : hater_count ? 1 : 0;
@@ -618,7 +621,9 @@ section("badboy_hatred", "Badboy", "Aggressive Expansion (Badboy)", state => {
 		SUMMARY("Badboy Haters (" + hater_count + ")"),
 		!hater_count && "Nobody is in a position to join a coalition against you.",
 		sortable({id: "badboyhaters", border: "1"},
-			["#Opinion", ABBR({title: "Aggressive Expansion", "data-numeric": 1}, "Badboy"), "#Improv", "Country", "Notes"],
+			["#Opinion", ABBR({title: "Aggressive Expansion", "data-numeric": 1}, "Badboy"), "#Improv",
+				ABBR({title: "Opinion if improved to +100", "data-numeric": 1}, "Cap"), "Country", "Notes",
+				"#Army", "#Manpower"],
 			haters,
 		),
 	];

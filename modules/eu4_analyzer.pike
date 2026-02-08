@@ -1681,10 +1681,19 @@ void analyze_obscurities(mapping data, string name, string tag, mapping write, m
 			if (opine->modifier == "improved_relation") impr = threeplace(opine->current_opinion);
 		}
 		if (ae < 50000 && risk->coalition_target != tag) continue;
+		int armysize = 0;
+		if (country->army) foreach (Array.arrayify(risk->army), mapping army) {
+			foreach (Array.arrayify(army->regiment), mapping reg) {
+				//Note that regiment strength is eg "0.807" for 807 men. We want the
+				//number of men, so there's no need to re-divide.
+				armysize += reg->strength ? threeplace(reg->strength) : 1000;
+			}
+		}
 		write->badboy_hatred += ({([
 			"tag": risk->tag,
 			"badboy": ae, "improved": impr,
 			"in_coalition": risk->coalition_target == tag,
+			"army": armysize, "manpower": threeplace(risk->manpower),
 		])});
 	}
 
