@@ -2130,6 +2130,7 @@ void analyze_obscurities(mapping data, string name, string tag, mapping write, m
 		//if ((int)faction->progress < 30) continue; //Could be null, otherwise is eg "10.000" for 10% progress
 		array uncovered = ({ });
 		foreach (faction->possible_provinces || ({ }), string provid) {
+			if (!data->provinces["-" + provid]->is_city) continue; //Colonies are too small to generate unrest.
 			[int unrest, array(string) sources] = provincial_unrest(data, provid, 1);
 			if (unrest > 0 && !country->rebel_suppression_coverage[provid])
 				uncovered += ({(["id": provid, "unrest": unrest, "sources": sources])});
