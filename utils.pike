@@ -29,6 +29,7 @@ void hd() {
 	object parser = G->bootstrap("modules/parser.pike");
 	function L10n = L10n_Satisfactory()->L10n;
 	mapping savefile = parser->low_parse_savefile(0);
+	//mapping savefile = parser->low_parse_savefile("Bah Humbug_autosave_1.sav");
 	array avail = ({ }), unclaimed = ({ });
 	foreach (savefile->tree->savefilebody->sublevels, mapping sl) foreach (sl->objects, array obj) {
 		if (obj[1] == "/Script/FactoryGame.FGRecipeManager\0")

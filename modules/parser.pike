@@ -283,7 +283,22 @@ mapping parse_savefile_data(Stdio.Buffer data, mapping|void options) {
 	[int sz] = data->sscanf("%-8c"); //Total size (will be equal to sizeof(data) after this returns)
 	tree = tree->savefilebody = ([]);
 	//Most of these are fixed and have unknown purpose
-	[int unk10, string unk11, int zero3, tree->hdr1, int unk13, string unk14, tree->hdr2] = data->sscanf("%-4c%-4H%-4c%-4c%-4c%-4H%-4c");
+	int pos = search(decomp, "MainGrid"); if (pos < 10) pos = 64;
+	werror("%O %O\n", pos, String.string2hex(((string)data)[..pos]) / 2 * " ");
+	[int mode] = data->sscanf("%-4c");
+	if (mode == 0) { //New save file, 1.2.0, Experimental branch
+		[int unk, string version] = data->sscanf("%-22c%-4H");
+		werror("22-byte unknown %O %O\n", unk, version);
+		//No idea how many of these there are
+		for (int i = 0; i < 12; ++i) {
+			[int marker, int unk] = data->sscanf("%-4c%-16c");
+			werror("%d %x\n", marker, unk);
+		}
+		[int lastmarker, mode] = data->sscanf("%-4c%-4c");
+		werror("And done. %O\n", String.string2hex(((string)data)[..64]));
+	}
+	//mode should now be nonzero. No idea what it means.
+	[string unk11, int zero3, tree->hdr1, int unk13, string unk14, tree->hdr2] = data->sscanf("%-4H%-4c%-4c%-4c%-4H%-4c");
 	//Level-grouping grids
 	for (int i = 0; i < 5; ++i) {
 		[string title, int unk17, int unk18, int n] = data->sscanf("%-4H%-4c%-4c%-4c");
