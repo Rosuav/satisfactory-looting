@@ -1,14 +1,3 @@
-class SSLContext {
-	inherit SSL.Context;
-	mapping all_certs() {return cert_chains_domain;}
-	//Like add_cert but removes previous certs for each domain
-	void replace_cert(SSL.Constants.CertificatePair cp) {
-		foreach( [array(string(8bit))] cp->globs, string(8bit) id )
-			cert_chains_domain[id] = ({cp});
-		cert_chains_issuer[cp->issuers[0]] = ({cp});
-	}
-}
-
 void handler(mixed ... args) { }
 
 void check_cert(SSL.Context ctx) {
