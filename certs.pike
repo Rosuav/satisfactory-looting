@@ -83,6 +83,7 @@ class SugarBuyer {
 		werror("Sugar: Waiting for %s cert...\n", fn);
 		object p = Concurrent.Promise();
 		files[fn] += ({p});
+		if (!cert) sock->write("fetch %s\n", fn); //If there previously wasn't any queue, we're the first, so request it
 		return await(p->future());
 	}
 
@@ -152,8 +153,7 @@ __async__ int main() {
 	object port = Protocols.WebSocket.SSLPort(handler, handler, 12345, "::",
 		pem->get_private_key(), pem->get_certificates());
 	await(check_conn(12345));
-	pem = Standards.PEM.Messages(Stdio.read_file("privkey44.pem") + Stdio.read_file("fullchain44.pem"));
+	pem = Standards.PEM.Messages(await(sugar->request("sikorsky.stillebot.com")));
 	replace_cert(port->ctx, pem);
 	await(check_conn(12345));
-	write("Pinging: %s\n", await(sugar->ping()) ? "Alive" : "Dead");
 }
