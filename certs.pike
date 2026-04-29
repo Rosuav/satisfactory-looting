@@ -1,3 +1,94 @@
+string totp(string secret, int|void tm) {
+	object hmac = Crypto.SHA1.HMAC(MIME.decode_base32(secret));
+	int input = (tm || time()) / 30;
+	string hash = hmac(sprintf("%8c", input));
+	int offset = hash[-1] & 15;
+	sscanf(hash[offset..offset+3], "%4c", int code);
+	code &= 0x7fffffff; //It's a 31-bit code, mask off the high bit
+	return ("00000000" + (string)code)[<7..]; //Assumes eight-digit codes
+}
+
+mapping instance_config = Standards.JSON.decode(Stdio.read_file("../stillebot/instance-config.json"));
+class SugarBuyer {
+	string buf = "";
+	array|zero file_receive = 0;
+	object sock;
+	Concurrent.Promise|zero pinging;
+	mapping(string:string|array) files = ([]);
+
+	void readable(object sock, string data) {
+		buf += data;
+		while (sscanf(buf, "%s\n%s", string line, buf) == 2) {
+			if (file_receive) {
+				if (line == ".") {
+					//File complete! See if anyone's waiting on it.
+					//Note that this has a very small race condition. I would like an atomic
+					//"replace mapping value and return the previous value" but we're single
+					//threaded so it shouldn't happen.
+					string|array pending = files[file_receive[0]];
+					files[file_receive[0]] = file_receive[1];
+					if (arrayp(pending)) pending->success(file_receive[1]);
+					file_receive = 0;
+					continue;
+				}
+				file_receive[1] += line + "\n";
+				continue;
+			}
+			[string cmd, array args] = Array.shift(line / " ");
+			switch (cmd) {
+				case "hello":
+					write("Sugarmill: Attempting auth...\n");
+					sock->write("auth sugar %s\n", totp(instance_config->sugar));
+					break;
+				case "login":
+					write("Sugarmill: Login OK\n");
+					//Rerequest any that have previously been requested, either because they're
+					//pending or because we already wanted them
+					foreach (files; string fn;) sock->write("fetch %s\n", fn);
+					break;
+				case "certificate": file_receive = ({args[0], ""}); break;
+				case "pong":
+					write("Sugarmill still alive\n");
+					if (pinging) pinging->success(1);
+					break;
+				default: break;
+			}
+		}
+	}
+
+	void closed(object sock) {
+		werror("SUGARMILL DISCONNECTED\n");
+		//Autoreconnect?
+	}
+
+	__async__ void reconnect() {
+		sock = Stdio.File();
+		sock->open_socket();
+		sock->set_nonblocking(readable, 0, closed);
+		if (!sock->connect_unix("/var/run/certmgr")) werror("SUGARMILL NOT RUNNING\n"); //Autoretry?
+	}
+
+	__async__ void ping() {
+		pinging = Concurrent.Promise();
+		sock->write("ping\n");
+		if (catch (await(pinging->timeout(0.5)))) reconnect(); //Ping failed. TODO: Reraise if it wasn't a timeout that got thrown
+		pinging = 0;
+		//Else ping succeeded, all well
+	}
+
+	__async__ string request(string fn) {
+		mixed cert = files[fn];
+		if (stringp(cert)) return cert;
+		//If not a string, it should be zero or an array. Add ourselves to it.
+		werror("Sugar: Waiting for %s cert...\n", fn);
+		object p = Concurrent.Promise();
+		files[fn] += ({p});
+		return await(p->future());
+	}
+
+	protected void create() {reconnect();}
+}
+
 void handler(mixed ... args) { }
 
 void check_cert(SSL.Context ctx) {
@@ -56,11 +147,13 @@ int main1() {
 }
 
 __async__ int main() {
-	object pem = Standards.PEM.Messages(Stdio.read_file("privkey43.pem") + Stdio.read_file("fullchain43.pem"));
+	object sugar = SugarBuyer();
+	object pem = Standards.PEM.Messages(await(sugar->request("stillebot.com")));
 	object port = Protocols.WebSocket.SSLPort(handler, handler, 12345, "::",
 		pem->get_private_key(), pem->get_certificates());
 	await(check_conn(12345));
 	pem = Standards.PEM.Messages(Stdio.read_file("privkey44.pem") + Stdio.read_file("fullchain44.pem"));
 	replace_cert(port->ctx, pem);
 	await(check_conn(12345));
+	write("Pinging: %s\n", await(sugar->ping()) ? "Alive" : "Dead");
 }
