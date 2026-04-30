@@ -67,6 +67,7 @@ class SugarBuyer {
 					//Rerequest any that have previously been requested, either because they're
 					//pending or because we already wanted them
 					foreach (awaiting; string fn;) sock->write("fetch %s\n", fn);
+					foreach (notify; string fn;) sock->write("fetch %s\n", fn);
 					break;
 				case "certificate": file_receive = ({args[0], ""}); break;
 				case "pong":
