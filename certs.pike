@@ -80,15 +80,18 @@ class SugarBuyer {
 
 	void closed(object sock) {
 		werror("SUGARMILL DISCONNECTED\n");
-		//Autoreconnect?
+		call_out(reconnect, 0.125);
 	}
 
 	__async__ void reconnect() {
 		sock = Stdio.File();
 		sock->open_socket();
 		sock->set_nonblocking(readable, 0, closed);
-		//"/var/run/certmgr" for production (will also need a proper 
-		if (!sock->connect_unix("/tmp/certmgr")) werror("SUGARMILL NOT RUNNING\n"); //Autoretry?
+		//"/var/run/certmgr" for production (will also need a proper 2FA secret)
+		if (!sock->connect_unix("/tmp/certmgr")) {
+			werror("SUGARMILL NOT RUNNING\n");
+			call_out(reconnect, 0.25);
+		}
 	}
 
 	__async__ void ping() {
@@ -157,5 +160,7 @@ __async__ int main() {
 	sugar->register("stillebot.com", port->ctx);
 	await(check_conn(12345));
 	sleep(1);
+	await(check_conn(12345));
+	sleep(10);
 	await(check_conn(12345));
 }
