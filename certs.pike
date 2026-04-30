@@ -8,7 +8,7 @@ string totp(string secret, int|void tm) {
 	return ("00000000" + (string)code)[<7..]; //Assumes eight-digit codes
 }
 
-mapping instance_config = Standards.JSON.decode(Stdio.read_file("../stillebot/instance-config.json"));
+mapping instance_config = (["sugar": "JBSWY3DPEHPK3PXP"]); //Test 2FA secret, won't work in production
 class SugarBuyer {
 	string buf = "";
 	array|zero file_receive = 0;
@@ -65,7 +65,8 @@ class SugarBuyer {
 		sock = Stdio.File();
 		sock->open_socket();
 		sock->set_nonblocking(readable, 0, closed);
-		if (!sock->connect_unix("/var/run/certmgr")) werror("SUGARMILL NOT RUNNING\n"); //Autoretry?
+		//"/var/run/certmgr" for production (will also need a proper 
+		if (!sock->connect_unix("/tmp/certmgr")) werror("SUGARMILL NOT RUNNING\n"); //Autoretry?
 	}
 
 	__async__ void ping() {
