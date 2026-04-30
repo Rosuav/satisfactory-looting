@@ -14,7 +14,7 @@ class SugarBuyer {
 	array|zero file_receive = 0;
 	object sock;
 	Concurrent.Promise|zero pinging;
-	mapping(string:string) files = ([]);
+	mapping(string:Standards.PEM.Messages) certs = ([]);
 	mapping(string:array(Concurrent.Promise)) awaiting = ([]);
 	mapping(string:array(SSL.Context)) notify = ([]);
 
@@ -28,9 +28,8 @@ class SugarBuyer {
 					//the chances that there's nobody either waiting or interested are
 					//very low; so we decode the PEM regardless.
 					string fn = file_receive[0];
-					werror("GOT FILE %O\n", fn);
-					files[fn] = file_receive[1];
 					object pem = Standards.PEM.Messages(file_receive[1]);
+					certs[fn] = pem;
 					file_receive = 0;
 					//Those waiting will have inserted promises into the array
 					if (array pending = m_delete(awaiting, fn))
@@ -88,12 +87,11 @@ class SugarBuyer {
 	}
 
 	__async__ Standards.PEM.Messages request(string fn) {
-		if (string cert = files[fn]) return Standards.PEM.Messages(cert);
-		//If not a string, it should be zero or an array. Add ourselves to it.
+		if (Standards.PEM.Messages cert = certs[fn]) return cert;
 		werror("Sugar: Waiting for %s cert...\n", fn);
 		object p = Concurrent.Promise();
 		awaiting[fn] += ({p});
-		if (sizeof(awaiting[fn]) == 1) sock->write("fetch %s\n", fn); //If we're the first, request it
+		sock->write("fetch %s\n", fn); //In theory we could skip this if someone else is waiting, but that's unlikely, and it won't hurt (we'll get an immediate "unilateral" transmission)
 		return await(p->future());
 	}
 
