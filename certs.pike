@@ -147,16 +147,6 @@ class check_conn {
 	}
 }
 
-int main1() {
-	object ctx = SSL.Context();
-	object pem = Standards.PEM.Messages(Stdio.read_file("privkey43.pem") + Stdio.read_file("fullchain43.pem"));
-	ctx->add_cert(pem->get_private_key(), pem->get_certificates(), ({"*"}));
-	check_cert(ctx);
-	pem = Standards.PEM.Messages(Stdio.read_file("privkey44.pem") + Stdio.read_file("fullchain44.pem"));
-	replace_cert(ctx, pem);
-	check_cert(ctx);
-}
-
 __async__ int main() {
 	object sugar = SugarBuyer();
 	object pem = await(sugar->request("stillebot.com"));
