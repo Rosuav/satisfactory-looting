@@ -8,6 +8,19 @@ string totp(string secret, int|void tm) {
 	return ("00000000" + (string)code)[<7..]; //Assumes eight-digit codes
 }
 
+//Replace a certificate in an SSL context. I don't know if this is actually a supported concept,
+//but it works fine, and future operations will use the new certificate.
+void replace_cert(SSL.Context ctx, Standards.PEM.Messages pem) {
+	array certs = pem->get_certificates();
+	//Find the existing CertificatePair. We assume that the set of domains will not change, so we use the
+	//new commonName to look up the CertificatePair, and will not be making any changes to that lookup.
+	object cert = Standards.X509.decode_certificate(certs[0]);
+	string cn = Standards.PKCS.Certificate.decode_distinguished_name(cert->subject)->commonName[0];
+	object cp = ctx->find_cert_domain(cn)[0];
+	object key = Standards.PKCS.parse_private_key(pem->get_private_key());
+	cp->key = key; cp->certs = certs;
+}
+
 mapping instance_config = (["sugar": "JBSWY3DPEHPK3PXP"]); //Test 2FA secret, won't work in production
 class SugarBuyer {
 	string buf = "";
@@ -112,17 +125,6 @@ void check_cert(SSL.Context ctx) {
 	werror("Cert expiration: 20%s-%s-%s %s:%s:%s\n", @parts);
 }
 
-void replace_cert(SSL.Context ctx, Standards.PEM.Messages pem) {
-	array certs = pem->get_certificates();
-	//Find the existing CertificatePair. We assume that the set of domains will not change, so we use the
-	//new commonName to look up the CertificatePair, and will not be making any changes to that lookup.
-	object cert = Standards.X509.decode_certificate(certs[0]);
-	string cn = Standards.PKCS.Certificate.decode_distinguished_name(cert->subject)->commonName[0];
-	object cp = ctx->find_cert_domain(cn)[0];
-	object key = Standards.PKCS.parse_private_key(pem->get_private_key());
-	cp->key = key; cp->certs = certs;
-}
-
 class check_conn {
 	inherit Concurrent.Promise;
 	object sock;
@@ -154,8 +156,6 @@ __async__ int main() {
 		pem->get_private_key(), pem->get_certificates());
 	sugar->register("stillebot.com", port->ctx);
 	await(check_conn(12345));
-	//pem = Standards.PEM.Messages(await(sugar->request("sikorsky.stillebot.com")));
-	//replace_cert(port->ctx, pem);
 	sleep(1);
 	await(check_conn(12345));
 }
