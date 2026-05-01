@@ -90,6 +90,7 @@ class SugarBuyer {
 		sock->open_socket();
 		sock->set_nonblocking(readable, 0, closed);
 		//"/var/run/certmgr" for production (will also need a proper 2FA secret)
+		//"/tmp/certmgr" for testing (can use the default 2FA secret)
 		if (!sock->connect_unix("/tmp/certmgr")) {
 			werror("SUGARMILL NOT RUNNING\n");
 			call_out(reconnect, 0.25);
