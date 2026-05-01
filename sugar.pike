@@ -1,10 +1,9 @@
 //Sugar buyer - connect to CSR and get a certificate
 inherit annotated;
 
-string totp(string secret, int|void tm) {
-	object hmac = Crypto.SHA1.HMAC(MIME.decode_base32(secret));
+string totp(int|void tm) {
 	int input = (tm || time()) / 30;
-	string hash = hmac(sprintf("%8c", input));
+	string hash = sugarmill_hmac(sprintf("%8c", input));
 	int offset = hash[-1] & 15;
 	sscanf(hash[offset..offset+3], "%4c", int code);
 	code &= 0x7fffffff; //It's a 31-bit code, mask off the high bit
@@ -24,7 +23,6 @@ void replace_cert(SSL.Context ctx, Standards.PEM.Messages pem) {
 	cp->key = key; cp->certs = certs;
 }
 
-mapping instance_config = (["sugar": "JBSWY3DPEHPK3PXP"]); //Test 2FA secret, won't work in production
 class SugarBuyer {
 	string buf = "";
 	array|zero file_receive = 0;
@@ -63,7 +61,7 @@ class SugarBuyer {
 			switch (cmd) {
 				case "hello":
 					write("Sugarmill: Attempting auth...\n");
-					sock->write("auth sugar %s\n", totp(instance_config->sugar));
+					sock->write("auth sugar %s\n", totp());
 					break;
 				case "login":
 					write("Sugarmill: Login OK\n");

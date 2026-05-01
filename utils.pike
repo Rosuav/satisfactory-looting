@@ -366,8 +366,7 @@ __async__ int certs() {
 	await(check_conn(12345));
 	sleep(1);
 	await(check_conn(12345));
-	sleep(10);
-	await(check_conn(12345));
+	//sleep(10); await(check_conn(12345)); //To test disconnecting the sugar mill
 }
 
 

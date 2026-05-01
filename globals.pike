@@ -31,6 +31,7 @@ void persist_save() {
 	}
 	Stdio.write_file(CONFIG_FILE, Standards.JSON.encode(persist, 5));
 }
+object sugarmill_hmac = Crypto.SHA1.HMAC(MIME.decode_base32(persist->sugarsecret || "JBSWY3DPEHPK3PXP")); //Default 2FA key grants access to test/expired certs only
 
 void load_satisfactory_l10n(string lang) {
 	//Is this always present?
