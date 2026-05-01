@@ -1,3 +1,6 @@
+//Sugar buyer - connect to CSR and get a certificate
+inherit annotated;
+
 string totp(string secret, int|void tm) {
 	object hmac = Crypto.SHA1.HMAC(MIME.decode_base32(secret));
 	int input = (tm || time()) / 30;
@@ -119,49 +122,19 @@ class SugarBuyer {
 	protected void create() {reconnect();}
 }
 
-void handler(mixed ... args) { }
-
-void check_cert(SSL.Context ctx) {
-	array cps = ctx->find_cert_domain("sikorsky.rosuav.com");
-	if (sizeof(cps) != 1) {werror("Cert domain not exactly one %O\n", cps); return;}
-	object cp = cps[0];
-	array parts = Standards.X509.decode_certificate(cp->certs[0])->validity[1]->value / 2;
-	werror("Cert expiration: 20%s-%s-%s %s:%s:%s\n", @parts);
+//TODO: Move the actual code into here, ideally making the class just maintain basic state
+@export: Standards.PEM.Messages request_certificate(string fn) {
+	return G->G->sugarbuyer->request(fn);
+}
+@export: void register_ssl_certificate(string fn, SSL.Context ctx) {
+	G->G->sugarbuyer->register(fn, ctx);
 }
 
-class check_conn {
-	inherit Concurrent.Promise;
-	object sock;
-	void sockclosed() {success(1);}
-
-	protected void create(int port) {
-		sock = Stdio.File();
-		sock->open_socket();
-		sock->set_nonblocking(0, rawwrite, sockclosed);
-		sock->connect("127.0.0.1", port);
-	}
-	void rawwrite() {
-		sock = SSL.File(sock, SSL.Context());
-		sock->set_nonblocking(0, 0, sockclosed, 0, 0) {
-			string cert = sock->get_peer_certificates()[0];
-			array parts = Standards.X509.decode_certificate(cert)->validity[1]->value / 2;
-			werror("Cert expiration: 20%s-%s-%s %s:%s:%s\n", @parts);
-			sock->close();
-			success(2);
-		};
-		sock->connect();
-	}
-}
-
-__async__ int main() {
-	object sugar = SugarBuyer();
-	object pem = await(sugar->request("stillebot.com"));
-	object port = Protocols.WebSocket.SSLPort(handler, handler, 12345, "::",
-		pem->get_private_key(), pem->get_certificates());
-	sugar->register("stillebot.com", port->ctx);
-	await(check_conn(12345));
-	sleep(1);
-	await(check_conn(12345));
-	sleep(10);
-	await(check_conn(12345));
+//Retain an existing sugar buyer if reasonable, else establish a new one
+constant VERSION = 1; //Increment if it's unreasonable to retain
+protected void create(string name) {
+	::create(name);
+	object|zero sug = G->G->sugarbuyer;
+	if (sug && sug->VERSION != VERSION) {sug->sock->close(); sug = 0;}
+	if (!sug) G->G->sugarbuyer = SugarBuyer();
 }

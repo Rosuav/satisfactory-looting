@@ -1,4 +1,4 @@
-array(string) bootstrap_files = ({"globals.pike", "connection.pike", "modules", "modules/http"});
+array(string) bootstrap_files = ({"globals.pike", "sugar.pike", "connection.pike", "modules", "modules/http"});
 array(string) restricted_update;
 mapping G = (["consolecmd": ([]), "dbsettings": ([]), "instance_config": ([])]);
 object CFG; //TODO: Rework this and don't have it here (see eu4_parser.pike TODO)
@@ -62,6 +62,7 @@ int|Concurrent.Future main(int argc,array(string) argv) {
 	foreach ("test help" / " ", string cmd) if (G->args[cmd]) G->args->exec = cmd; //"--test" is a synonym for "--exec=test"
 	if (string fn = G->args->exec) {
 		bootstrap("globals.pike");
+		bootstrap("sugar.pike");
 		object utils = bootstrap("utils.pike");
 		if (fn == 1)
 			if (sizeof(G->args[Arg.REST])) [fn, G->args[Arg.REST]] = Array.shift(G->args[Arg.REST]);

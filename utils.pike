@@ -333,6 +333,44 @@ void eu5l10n() {
 	write("%d case insensitive matches found.\n", found);
 }
 
+class check_conn {
+	inherit Concurrent.Promise;
+	object sock;
+	void sockclosed() {success(1);}
+
+	protected void create(int port) {
+		sock = Stdio.File();
+		sock->open_socket();
+		sock->set_nonblocking(0, rawwrite, sockclosed);
+		sock->connect("127.0.0.1", port);
+	}
+	void rawwrite() {
+		sock = SSL.File(sock, SSL.Context());
+		sock->set_nonblocking(0, 0, sockclosed, 0, 0) {
+			string cert = sock->get_peer_certificates()[0];
+			array parts = Standards.X509.decode_certificate(cert)->validity[1]->value / 2;
+			werror("Cert expiration: 20%s-%s-%s %s:%s:%s\n", @parts);
+			sock->close();
+			success(2);
+		};
+		sock->connect();
+	}
+}
+
+__async__ int certs() {
+	object pem = await(request_certificate("stillebot.com"));
+	void handler(mixed ... args) { }
+	object port = Protocols.WebSocket.SSLPort(handler, handler, 12345, "::",
+		pem->get_private_key(), pem->get_certificates());
+	register_ssl_certificate("stillebot.com", port->ctx);
+	await(check_conn(12345));
+	sleep(1);
+	await(check_conn(12345));
+	sleep(10);
+	await(check_conn(12345));
+}
+
+
 @"Edited as needed, does what's needed":
 void test() {
 	trace_on_signal();
