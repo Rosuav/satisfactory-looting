@@ -23,7 +23,7 @@ void replace_cert(SSL.Context ctx, Standards.PEM.Messages pem) {
 	cp->key = key; cp->certs = certs;
 }
 
-class SugarBuyer {
+class SugarBuyer(int VERSION) {
 	string buf = "";
 	array|zero file_receive = 0;
 	object sock;
@@ -91,7 +91,7 @@ class SugarBuyer {
 		sock->set_nonblocking(readable, 0, closed);
 		//"/var/run/certmgr" for production (will also need a proper 2FA secret)
 		//"/tmp/certmgr" for testing (can use the default 2FA secret)
-		if (!sock->connect_unix("/tmp/certmgr")) {
+		if (!sock->connect_unix("/var/run/certmgr")) {
 			werror("SUGARMILL NOT RUNNING\n");
 			call_out(reconnect, 0.25);
 		}
@@ -135,5 +135,5 @@ protected void create(string name) {
 	::create(name);
 	object|zero sug = G->G->sugarbuyer;
 	if (sug && sug->VERSION != VERSION) {sug->sock->close(); sug = 0;}
-	if (!sug) G->G->sugarbuyer = SugarBuyer();
+	if (!sug) G->G->sugarbuyer = SugarBuyer(VERSION);
 }
