@@ -363,10 +363,10 @@ __async__ int certs() {
 	object port = Protocols.WebSocket.SSLPort(handler, handler, 12345, "::",
 		pem->get_private_key(), pem->get_certificates());
 	register_ssl_certificate("stillebot.com", port->ctx);
-	await(check_conn(12345));
-	sleep(1);
-	await(check_conn(12345));
-	//sleep(10); await(check_conn(12345)); //To test disconnecting the sugar mill
+	while (1) {
+		await(check_conn(12345));
+		sleep(30);
+	}
 }
 
 

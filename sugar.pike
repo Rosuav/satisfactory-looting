@@ -1,6 +1,10 @@
 //Sugar buyer - connect to CSR and get a certificate
 inherit annotated;
 
+@retain: mapping(string:Standards.PEM.Messages) sugarmill_certs = ([]);
+@retain: mapping(string:array(Concurrent.Promise)) sugarmill_awaiting = ([]);
+@retain: mapping(string:array(SSL.Context)) sugarmill_notify = ([]);
+
 string totp(int|void tm) {
 	int input = (tm || time()) / 30;
 	string hash = sugarmill_hmac(sprintf("%8c", input));
@@ -13,6 +17,7 @@ string totp(int|void tm) {
 //Replace a certificate in an SSL context. I don't know if this is actually a supported concept,
 //but it works fine, and future operations will use the new certificate.
 void replace_cert(SSL.Context ctx, Standards.PEM.Messages pem) {
+	werror("Replace cert!\n");
 	array certs = pem->get_certificates();
 	//Find the existing CertificatePair. We assume that the set of domains will not change, so we use the
 	//new commonName to look up the CertificatePair, and will not be making any changes to that lookup.
@@ -28,9 +33,6 @@ class SugarBuyer(int VERSION) {
 	array|zero file_receive = 0;
 	object sock;
 	Concurrent.Promise|zero pinging;
-	mapping(string:Standards.PEM.Messages) certs = ([]);
-	mapping(string:array(Concurrent.Promise)) awaiting = ([]);
-	mapping(string:array(SSL.Context)) notify = ([]);
 
 	void readable(object sock, string data) {
 		buf += data;
@@ -43,14 +45,14 @@ class SugarBuyer(int VERSION) {
 					//very low; so we decode the PEM regardless.
 					string fn = file_receive[0];
 					object pem = Standards.PEM.Messages(file_receive[1]);
-					certs[fn] = pem;
+					sugarmill_certs[fn] = pem;
 					file_receive = 0;
 					//Those waiting will have inserted promises into the array
-					if (array pending = m_delete(awaiting, fn))
+					if (array pending = m_delete(sugarmill_awaiting, fn))
 						pending->success(pem);
 					//And those interested will have stuck SSL contexts into a separate array.
 					//These ones remain, so multiple notifications can be sent to the same context.
-					if (array interested = notify[fn])
+					if (array interested = sugarmill_notify[fn])
 						replace_cert(interested[*], pem);
 					continue;
 				}
@@ -67,8 +69,8 @@ class SugarBuyer(int VERSION) {
 					write("Sugarmill: Login OK\n");
 					//Rerequest any that have previously been requested, either because they're
 					//pending or because we already wanted them
-					foreach (awaiting; string fn;) sock->write("fetch %s\n", fn);
-					foreach (notify; string fn;) sock->write("fetch %s\n", fn);
+					foreach (sugarmill_awaiting; string fn;) sock->write("fetch %s\n", fn);
+					foreach (sugarmill_notify; string fn;) sock->write("fetch %s\n", fn);
 					break;
 				case "certificate": file_receive = ({args[0], ""}); break;
 				case "pong":
@@ -106,16 +108,16 @@ class SugarBuyer(int VERSION) {
 	}
 
 	__async__ Standards.PEM.Messages request(string fn) {
-		if (Standards.PEM.Messages cert = certs[fn]) return cert;
+		if (Standards.PEM.Messages cert = sugarmill_certs[fn]) return cert;
 		werror("Sugar: Waiting for %s cert...\n", fn);
 		object p = Concurrent.Promise();
-		awaiting[fn] += ({p});
+		sugarmill_awaiting[fn] += ({p});
 		sock->write("fetch %s\n", fn); //In theory we could skip this if someone else is waiting, but that's unlikely, and it won't hurt (we'll get an immediate "unilateral" transmission)
 		return await(p->future());
 	}
 
 	void register(string fn, SSL.Context ctx) {
-		notify[fn] += ({ctx});
+		sugarmill_notify[fn] += ({ctx});
 	}
 
 	protected void create() {reconnect();}
