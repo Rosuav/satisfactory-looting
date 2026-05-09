@@ -131,10 +131,7 @@ class Connection(Stdio.File sock) {
 }
 void sock_connected(object mainsock) {while (object sock = mainsock->accept()) Connection(sock);}
 
-protected void create(string name)
-{
-	::create(name);
-	register_bouncer(ws_handler); register_bouncer(ws_msg); register_bouncer(ws_close);
+__async__ void setup_http_server() {
 	if (mixed ex = catch {
 		string cert = Stdio.read_file("../stillebot/certificate.pem");
 		string cert2 = Stdio.read_file("../stillebot/certificate_local.pem");
@@ -171,6 +168,12 @@ protected void create(string name)
 		//Ensure that we don't accidentally use something unsafe (eg if it's an SSL issue)
 		if (object http = m_delete(G->G, "httpserver")) catch {http->close();};
 	}
+}
+
+protected void create(string name) {
+	::create(name);
+	register_bouncer(ws_handler); register_bouncer(ws_msg); register_bouncer(ws_close);
+	setup_http_server();
 	if (G->G->notify_mainsock) G->G->notify_mainsock->set_accept_callback(sock_connected);
 	else (G->G->notify_mainsock = Stdio.Port())->bind(1444, sock_connected, "::", 1); //TODO: Switch port to 1444 to complete the migration (part 1)
 }
