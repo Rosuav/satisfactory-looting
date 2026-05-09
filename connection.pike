@@ -133,35 +133,18 @@ void sock_connected(object mainsock) {while (object sock = mainsock->accept()) C
 
 __async__ void setup_http_server() {
 	if (mixed ex = catch {
-		string cert = Stdio.read_file("../stillebot/certificate.pem");
-		string cert2 = Stdio.read_file("../stillebot/certificate_local.pem");
-		string combined = (cert || "") + (cert2 || ""); //If either cert changes, update both certs and keys
-		if (object http = combined != G->G->httpserver_certificate && m_delete(G->G, "httpserver")) {
-			//Cert(s) has/have changed. Force the server to be restarted.
-			http->close();
-			werror("Resetting HTTP server.\n");
-		}
+		object ctx = G->G->opportunistic_tls_ctx = SSL.Context();
+		object pem = await(request_certificate("stillebot.com"));
+		G->G->opportunistic_tls_ctx->add_cert(pem->get_private_key(), pem->get_certificates(), ({"*"}));
+		register_ssl_certificate("stillebot.com", ctx);
+		pem = await(request_certificate("sikorsky.stillebot.com"));
+		G->G->opportunistic_tls_ctx->add_cert(pem->get_private_key(), pem->get_certificates());
+		register_ssl_certificate("sikorsky.stillebot.com", ctx);
 
-		if (G->G->httpserver) G->G->httpserver->callback = http_handler;
-		else {
-			G->G->httpserver_certificate = combined;
-			G->G->opportunistic_tls_ctx = SSL.Context();
-			array|zero wildcard = ({"*"});
-			foreach (({"", "_local"}), string tag) {
-				string cert = Stdio.read_file("../stillebot/certificate" + tag + ".pem");
-				string key = Stdio.read_file("../stillebot/privkey" + tag + ".pem");
-				if (key && cert) {
-					string pk = Standards.PEM.simple_decode(key);
-					array certs = Standards.PEM.Messages(cert)->get_certificates();
-					G->G->opportunistic_tls_ctx->add_cert(pk, certs, wildcard);
-					wildcard = UNDEFINED; //Only one wildcard cert.
-				}
-			}
-			//TODO: Switch port to 8087 to complete the migration (part 1)
-			//TODO: Also listen on 1444 to complete the migration (part 2)
-			G->G->httpserver = Protocols.WebSocket.Port(http_handler, ws_handler, 8087, "::");
-			G->G->httpserver->request_program = Function.curry(trytls)(ws_handler);
-		}
+		//TODO: Switch port to 8087 to complete the migration (part 1)
+		//TODO: Also listen on 1444 to complete the migration (part 2)
+		G->G->httpserver = Protocols.WebSocket.Port(http_handler, ws_handler, 8087, "::");
+		G->G->httpserver->request_program = Function.curry(trytls)(ws_handler);
 	}) {
 		werror("NO HTTP SERVER AVAILABLE\n%s\n", describe_backtrace(ex));
 		werror("Continuing without.\n");
@@ -173,7 +156,8 @@ __async__ void setup_http_server() {
 protected void create(string name) {
 	::create(name);
 	register_bouncer(ws_handler); register_bouncer(ws_msg); register_bouncer(ws_close);
-	setup_http_server();
+	if (G->G->httpserver) G->G->httpserver->callback = http_handler;
+	else setup_http_server();
 	if (G->G->notify_mainsock) G->G->notify_mainsock->set_accept_callback(sock_connected);
 	else (G->G->notify_mainsock = Stdio.Port())->bind(1444, sock_connected, "::", 1); //TODO: Switch port to 1444 to complete the migration (part 1)
 }
