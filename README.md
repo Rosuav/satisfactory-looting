@@ -7,8 +7,7 @@ to find, well, lots of things.
 
 The information can best be viewed using a web browser; the default
 port is 1200 but this can be changed. It can be accessed on HTTP or
-HTTPS, with the latter requiring that the necessary cert/key be in
-the "../stillebot/" directory (don't ask).
+HTTPS, with the latter requiring the Sugar Mill cert manager.
 TODO: Change to port 8087 when the migration is complete.
 
 Available URLs and corresponding socket groups:
