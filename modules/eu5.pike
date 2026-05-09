@@ -152,6 +152,7 @@ mapping|array read_maparray(Stdio.Buffer buf, string path, mapping xtra) {
 }
 
 mapping eu5_parse_savefile(string fn) {
+	return (["error": "Disabled for now"]); //Hack out EU5 parsing to speed up restart testing
 	string data = Stdio.read_file(fn);
 	if (!data) return (["error": "Unable to read file"]);
 	Stdio.Buffer buf = Stdio.Buffer(data); buf->read_only();

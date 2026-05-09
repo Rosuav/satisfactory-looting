@@ -54,5 +54,5 @@ int maxvalue(mapping x) {return max(@values(x));}
 
 protected void create(string name) {
 	::create(name);
-	if (!sizeof(session_mtimes)) load_sessions();
+	//if (!sizeof(session_mtimes)) load_sessions(); //Hacked out for now
 }
