@@ -347,9 +347,13 @@ class check_conn {
 	void rawwrite() {
 		sock = SSL.File(sock, SSL.Context());
 		sock->set_nonblocking(0, 0, sockclosed, 0, 0) {
-			string cert = sock->get_peer_certificates()[0];
-			array parts = Standards.X509.decode_certificate(cert)->validity[1]->value / 2;
-			werror("Cert expiration: 20%s-%s-%s %s:%s:%s\n", @parts);
+			object cert = Standards.X509.decode_certificate(sock->get_peer_certificates()[0]);
+			array dates = ({ });
+			foreach (({cert->validity[0], cert->validity[1]}), object val) { //Sadly, validity isn't itself iterable
+				array parts = val->value / 2;
+				dates += ({sprintf("20%s-%s-%s %s:%s:%s", @parts)});
+			}
+			werror("Certificate valid from %s to %s\n", @dates);
 			sock->close();
 			success(2);
 		};
@@ -369,6 +373,9 @@ __async__ int certs() {
 	}
 }
 
+__async__ void cert_check() {
+	await(check_conn(8087));
+}
 
 @"Edited as needed, does what's needed":
 void test() {
