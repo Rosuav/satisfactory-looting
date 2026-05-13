@@ -240,7 +240,7 @@ protected void create(string name) {
 	object inot = G->G->inotify = System.Inotify.Instance();
 	foreach (SAVE_MOVE_PATHS; string path;)
 		inot->add_watch(path, System.Inotify.IN_CLOSE_WRITE | System.Inotify.IN_MOVED_TO | System.Inotify.IN_MOVED_FROM, detect_save_move);
-	inot->add_watch(SATIS_SAVE_PATH, System.Inotify.IN_CLOSE_WRITE | System.Inotify.IN_DELETE) {
+	if (0) inot->add_watch(SATIS_SAVE_PATH, System.Inotify.IN_CLOSE_WRITE | System.Inotify.IN_DELETE) {
 		//In contrast to EU4, which *moves* files to the target name, Satisfactory always writes directly,
 		//possibly after moving the old file away. So we take the easy option and just report when a file
 		//is closed after being written to.
