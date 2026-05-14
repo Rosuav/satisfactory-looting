@@ -333,12 +333,12 @@ void eu5l10n() {
 	write("%d case insensitive matches found.\n", found);
 }
 
-class check_conn {
+class check_conn(int port, string|void host) {
 	inherit Concurrent.Promise;
 	object sock;
 	void sockclosed() {success(1);}
 
-	protected void create(int port) {
+	protected void create() {
 		sock = Stdio.File();
 		sock->open_socket();
 		sock->set_nonblocking(0, rawwrite, sockclosed);
@@ -353,11 +353,11 @@ class check_conn {
 				array parts = val->value / 2;
 				dates += ({sprintf("20%s-%s-%s %s:%s:%s", @parts)});
 			}
-			werror("Certificate valid from %s to %s\n", @dates);
+			werror("Cert for %s valid %s to %s\n", cert->subject_str(), @dates);
 			sock->close();
 			success(2);
 		};
-		sock->connect();
+		sock->connect(host);
 	}
 }
 
@@ -375,6 +375,7 @@ __async__ int certs() {
 
 __async__ void cert_check() {
 	await(check_conn(8087));
+	await(check_conn(8087, "sikorsky.mustardmine.com"));
 }
 
 @"Edited as needed, does what's needed":
