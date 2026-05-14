@@ -353,7 +353,7 @@ class check_conn(int port, string|void host) {
 				array parts = val->value / 2;
 				dates += ({sprintf("20%s-%s-%s %s:%s:%s", @parts)});
 			}
-			werror("Cert for %s valid %s to %s\n", cert->subject_str(), @dates);
+			werror("Valid from %s to %s: %s\n", @dates, cert->subject_str());
 			sock->close();
 			success(2);
 		};
