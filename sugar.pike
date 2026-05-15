@@ -120,6 +120,17 @@ class SugarBuyer(int VERSION) {
 		sugarmill_notify[fn] += ({ctx});
 	}
 
+	//Request a cert, add it to the context, and register the context for changes.
+	//Simple API for simple use-cases; if anything else is needed, use request/register.
+	//Will make a vanilla context if none provided.
+	__async__ SSL.Context provide_cert(string fn, SSL.Context|void ctx) {
+		if (!ctx) ctx = SSL.Context();
+		object pem = await(request(fn));
+		ctx->add_cert(pem->get_private_key(), pem->get_certificates());
+		register(fn, ctx);
+		return ctx;
+	}
+
 	protected void create() {reconnect();}
 }
 
@@ -129,6 +140,9 @@ class SugarBuyer(int VERSION) {
 }
 @export: void register_ssl_certificate(string fn, SSL.Context ctx) {
 	G->G->sugarbuyer->register(fn, ctx);
+}
+@export: void provide_ssl_certificate(string fn, SSL.Context|void ctx) {
+	G->G->sugarbuyer->provide_cert(fn, ctx);
 }
 
 //Retain an existing sugar buyer if reasonable, else establish a new one
