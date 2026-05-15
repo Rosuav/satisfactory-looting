@@ -40,7 +40,7 @@ void load_satisfactory_l10n(string lang) {
 	//The file consists of an array of native classes and their corresponding collections
 	//of internal classes. We don't care about the distinctions and will just map an
 	//internal class name to its display name.
-	array natives = Standards.JSON.decode(unicode_to_string(Stdio.read_file(fn) || "[]"));
+	array natives = Standards.JSON.decode(unicode_to_string(Stdio.read_file(fn) || "\0[\0]"));
 	mapping l10n = G->G->satis_l10n = ([
 		//Special-case anything that isn't in the files themselves.
 		"Desc_CartridgeSmart_C": "Rifle Smartridge",
