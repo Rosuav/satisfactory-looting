@@ -141,8 +141,8 @@ class SugarBuyer(int VERSION) {
 @export: void register_ssl_certificate(string fn, SSL.Context ctx) {
 	G->G->sugarbuyer->register(fn, ctx);
 }
-@export: void provide_ssl_certificate(string fn, SSL.Context|void ctx) {
-	G->G->sugarbuyer->provide_cert(fn, ctx);
+@export: Concurrent.Future provide_ssl_certificate(string fn, SSL.Context|void ctx) {
+	return G->G->sugarbuyer->provide_cert(fn, ctx);
 }
 
 //Retain an existing sugar buyer if reasonable, else establish a new one
