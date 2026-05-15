@@ -139,9 +139,9 @@ __async__ void setup_http_server() {
 		if (G->G->args->nossl) return;
 		object ctx = G->G->opportunistic_tls_ctx = SSL.Context();
 		object pem = await(request_certificate("stillebot.com"));
-		G->G->opportunistic_tls_ctx->add_cert(pem->get_private_key(), pem->get_certificates(), ({"*"}));
+		ctx->add_cert(pem->get_private_key(), pem->get_certificates(), ({"*"}));
 		register_ssl_certificate("stillebot.com", ctx);
-		await(provide_ssl_certificate("sikorsky.mustardmine.com", G->G->opportunistic_tls_ctx));
+		await(provide_ssl_certificate("sikorsky.mustardmine.com", ctx));
 		G->G->httpserver->request_program = Function.curry(trytls)(ws_handler);
 	}) {
 		werror("NO HTTP SERVER AVAILABLE\n%s\n", describe_backtrace(ex));
