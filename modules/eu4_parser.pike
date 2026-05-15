@@ -852,7 +852,7 @@ void spawn() {
 	G->G->parser_proc = Process.spawn_pike(({"app.pike", "--parse"}), (["fds": ({parser_pipe->pipe(Stdio.PROP_NONBLOCK|Stdio.PROP_BIDIRECTIONAL|Stdio.PROP_IPC)})]));
 	parser_pipe->set_nonblocking(parser_pipe_msg, 0) {parser_pipe->close();};
 	//Find the newest .eu4 file in the directory and (re)parse it, then watch for new files.
-	array(string) files = (EU4_LOCAL_PATH + "/save games/") + get_dir(EU4_LOCAL_PATH + "/save games")[*];
+	array(string) files = (EU4_LOCAL_PATH + "/save games/") + (get_dir(EU4_LOCAL_PATH + "/save games") || ({ }))[*];
 	sort(file_stat(files[*])->mtime, files);
 	if (sizeof(files)) process_savefile(files[-1]);
 }

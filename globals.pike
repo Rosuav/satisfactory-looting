@@ -74,7 +74,7 @@ void l10n_scan_dir(string dir, mapping xlat) {
 
 void load_eu5_l10n(string lang) {
 	mapping xlat = ([]);
-	foreach (sort(get_dir(EU5_PROGRAM_PATH + "/game")), string section)
+	foreach (sort(get_dir(EU5_PROGRAM_PATH + "/game") || ({ })), string section)
 		l10n_scan_dir(EU5_PROGRAM_PATH + "/game/" + section + "/localization/" + lang, xlat);
 	G->G->EU5_L10N = xlat;
 }
