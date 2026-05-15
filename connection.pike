@@ -133,6 +133,10 @@ void sock_connected(object mainsock) {while (object sock = mainsock->accept()) C
 
 __async__ void setup_http_server() {
 	if (mixed ex = catch {
+		//TODO: Switch port to 8087 to complete the migration (part 1)
+		//TODO: Also listen on 1444 to complete the migration (part 2)
+		G->G->httpserver = Protocols.WebSocket.Port(http_handler, ws_handler, 8087, "::");
+		if (G->G->args->nossl) return;
 		object ctx = G->G->opportunistic_tls_ctx = SSL.Context();
 		object pem = await(request_certificate("stillebot.com"));
 		G->G->opportunistic_tls_ctx->add_cert(pem->get_private_key(), pem->get_certificates(), ({"*"}));
@@ -140,10 +144,6 @@ __async__ void setup_http_server() {
 		pem = await(request_certificate("sikorsky.stillebot.com"));
 		G->G->opportunistic_tls_ctx->add_cert(pem->get_private_key(), pem->get_certificates());
 		register_ssl_certificate("sikorsky.stillebot.com", ctx);
-
-		//TODO: Switch port to 8087 to complete the migration (part 1)
-		//TODO: Also listen on 1444 to complete the migration (part 2)
-		G->G->httpserver = Protocols.WebSocket.Port(http_handler, ws_handler, 8087, "::");
 		G->G->httpserver->request_program = Function.curry(trytls)(ws_handler);
 	}) {
 		werror("NO HTTP SERVER AVAILABLE\n%s\n", describe_backtrace(ex));

@@ -135,6 +135,7 @@ class SugarBuyer(int VERSION) {
 constant VERSION = 1; //Increment if it's unreasonable to retain
 protected void create(string name) {
 	::create(name);
+	if (G->G->args->nossl) return;
 	object|zero sug = G->G->sugarbuyer;
 	if (sug && sug->VERSION != VERSION) {sug->sock->close(); sug = 0;}
 	if (!sug) G->G->sugarbuyer = SugarBuyer(VERSION);
