@@ -342,7 +342,9 @@ class check_conn(int port, string|void host) {
 		sock = Stdio.File();
 		sock->open_socket();
 		sock->set_nonblocking(0, rawwrite, sockclosed);
-		sock->connect("127.0.0.1", port);
+		string ip = "127.0.0.1";
+		if (port < 0) {port = -port; ip = "37.61.205.138";}
+		sock->connect(ip, port);
 	}
 	void rawwrite() {
 		sock = SSL.File(sock, SSL.Context());
@@ -376,6 +378,10 @@ __async__ int certs() {
 __async__ void cert_check() {
 	await(check_conn(8087));
 	await(check_conn(8087, "sikorsky.mustardmine.com"));
+	await(check_conn(6789));
+	await(check_conn(6789, "sikorsky.mustardmine.com"));
+	await(check_conn(-443, "mustardmine.com"));
+	await(check_conn(-443, "gideon.mustardmine.com"));
 }
 
 @"Edited as needed, does what's needed":
