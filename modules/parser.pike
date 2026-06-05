@@ -228,7 +228,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 mapping low_parse_savefile(string|zero fn, mapping|void options) {
 	if (!fn) {
 		//Pick the latest file and parse that.
-		array files = get_dir(SATIS_SAVE_PATH), paths = SATIS_SAVE_PATH + "/" + files[*];
+		array files = glob("*.sav", get_dir(SATIS_SAVE_PATH)), paths = SATIS_SAVE_PATH + "/" + files[*];
 		array times = file_stat(paths[*])->mtime;
 		sort(times, files);
 		fn = files[-1];
