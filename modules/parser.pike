@@ -38,18 +38,23 @@ string read_string(Stdio.Buffer data) {
 }
 
 //Properties. If chain, expect more meaningful data after the None - otherwise, everything up to the end marker will be discarded.
-mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string path) {
+mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string path, int ver) {
 	mapping ret = ([]);
 	//ret->_raw = ((string)data)[..sizeof(data) - end - 1]; ret->_path = path; //HACK
 	ret->_keyorder = ({ });
+	int log = G->G->show_first; G->G->show_first = 0;
+	if (log) werror("parse_properties path %O raw %O\n", path, String.string2hex(((string)data)[..sizeof(data) - end - 1]) / 2 * " ");
 	while (sizeof(data) > end) {
 		[string prop] = data->sscanf("%-4H");
+		if (log) werror("parse_properties prop %O\n", prop);
 		if (prop == "None\0") break; //There MAY still be a type after that, but it won't be relevant. If there is, it'll be skipped in the END part.
 		//To search for something found by scanning the strings:
 		//if (prop == "mVisitedAreas\0") write("*** FOUND %O --> %O\n", path, prop);
 		[string type] = data->sscanf("%-4H");
 		mapping p = (["type": type - "\0"]);
-		[int sz, p->idx] = data->sscanf("%-4c%-4c");
+		int sz = data->sscanf("%-4c")[0];
+		if (log) werror("parse_properties sz %O now %O\n", sz, String.string2hex(((string)data)[..sizeof(data) - end - 1]) / 2 * " ");
+		if (ver < 60) p->idx = data->sscanf("%-4c")[0]; //The index field seemed to disappear????
 		if (p->idx) {
 			//Currently the ONLY attribute that uses this is mLastSafeGroundPositions
 			//There are three such positions stored, and they're simply duplicated.
@@ -105,7 +110,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 							case "Vector": struct->value = data->sscanf("%-4F%-4F%-4F"); break;
 							case "LinearColor": struct->value = data->sscanf("%-4F%-4F%-4F%-4F"); break;
 							default: //A lot will be property lists
-								struct |= parse_properties(data, end, 1, path + " --> " + prop - "\0");
+								struct |= parse_properties(data, end, 1, path + " --> " + prop - "\0", ver);
 								break;
 						}
 						arr += ({struct});
@@ -171,7 +176,7 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 					//werror("TODO: StructProperty %O\n", p->subtype);
 					break;
 				default:
-					p->value = parse_properties(data, end, 0, path + " --> " + prop - "\0");
+					p->value = parse_properties(data, end, 0, path + " --> " + prop - "\0", ver);
 					break;
 			}
 			sz = sizeof(data) - end;
@@ -373,7 +378,8 @@ mapping parse_savefile_data(Stdio.Buffer data, mapping|void options) {
 			} else {
 				//Object. Nothing interesting here.
 			}
-			mapping prop = obj->prop = parse_properties(data, propend, 0, objects[i][1] - "\0");
+			if (obj->ver == 60) obj->unk_prefix_byte = data->read(1);
+			mapping prop = obj->prop = parse_properties(data, propend, 0, objects[i][1] - "\0", obj->ver);
 			if (interesting) write("Properties %O\n", prop);
 			if (has_value(objects[i][1], "Pickup_Spawnable")) {
 				string id = (replace(prop->mPickupItems->value->Item->value, "\0", "") / ".")[-1];
@@ -720,7 +726,7 @@ string nt(string val) {
 	return val + "\0";
 }
 
-void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
+void encode_properties(Stdio.Buffer _orig_dest, mapping props, int ver) {
 	//if (props->_raw) {dest->add(props->_raw); return;}
 	Stdio.Buffer dest = Stdio.Buffer();
 	//Is the order of properties significant? The game itself seems to be fine with them in any order
@@ -732,7 +738,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 		foreach (p->type == "_repetition" ? p->values : ({p}), mapping p) {
 			dest->sprintf("%-4H%-4H", nt(name), nt(p->type));
 			object prop_size = buffer_size(dest, "%-4c");
-			dest->sprintf("%-4c", p->idx);
+			if (ver < 60) dest->sprintf("%-4c", p->idx);
 			prop_size->ref += 5; //There should always be a padding byte.
 			//TODO: Everything that was resetting end or sz during parse_properties will need to update prop_size->ref
 			object struct_size;
@@ -757,7 +763,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 								case "Vector": dest->sprintf("%-4F%-4F%-4F", @elem->value); break;
 								case "LinearColor": dest->sprintf("%-4F%-4F%-4F%-4F", @elem->value); break;
 								default: //A lot will be property lists
-									encode_properties(dest, elem);
+									encode_properties(dest, elem, ver);
 									break;
 							}
 							break;
@@ -818,7 +824,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 							//TODO as above, for now they come from residue
 							break;
 						default:
-							encode_properties(dest, p->value);
+							encode_properties(dest, p->value, ver);
 							break;
 					}
 					break;
@@ -844,7 +850,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props) {
 			props, sizeof(dest), (string)dest, sizeof(props->_raw), props->_raw,
 			sizeof(paired), paired,
 		);
-		write("Reparse: %O\n", parse_properties(Stdio.Buffer((string)dest), 0, 0, "reparse"));
+		write("Reparse: %O\n", parse_properties(Stdio.Buffer((string)dest), 0, 0, "reparse", ver));
 	}
 	_orig_dest->add(dest);
 }
@@ -888,7 +894,7 @@ string reconstitute_savefile_body(int ver1, mapping tree) {
 			//All the rest of the object's information - possibly including trailing bytes - gets its length stored.
 			Stdio.Buffer objbytes = Stdio.Buffer();
 			if (o[0]) objbytes->sprintf("%-4H%-4H%-4c%{%-4H%-4H%}", obj->parlvl, obj->parpath, sizeof(obj->components), obj->components);
-			encode_properties(objbytes, obj->prop);
+			encode_properties(objbytes, obj->prop, obj->ver);
 			level->sprintf("%-4H", (string)objbytes);
 		}
 		if (sublevel->post_objects_bytes) level->add(sublevel->post_objects_bytes);
