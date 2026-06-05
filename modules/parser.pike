@@ -897,6 +897,12 @@ string reconstitute_savefile_body(int ver1, mapping tree) {
 			//See above in the parsing; in the sublevels, this is just an integer, but
 			//in the persistent level, there's an array of strings.
 			if (arrayp(sublevel->unkv14)) data->sprintf("%-4c%{%-4H%}", sizeof(sublevel->unkv14), sublevel->unkv14);
+			else if (sublevel->unkv14 == 60) {
+				data->sprintf("%-4c", sublevel->unkv14);
+				data->sprintf("%-4c%-4c%-4c%-4c%-4c", @sublevel->unkv14b);
+				data->sprintf("%-4c%{%-2c%}", sizeof(sublevel->unkv14_shorts), sublevel->unkv14_shorts);
+				data->sprintf("%-4c%-4H", @sublevel->unkv14c);
+			}
 			else data->sprintf("%-4c", sublevel->unkv14);
 		}
 		//Note that collectables are *included* in the headers size, but collecteds are *excluded* from the objects size.
