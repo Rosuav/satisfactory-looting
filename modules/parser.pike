@@ -403,6 +403,15 @@ mapping parse_savefile_data(Stdio.Buffer data, mapping|void options) {
 		if (ver1 >= 14) {
 			[sublevel->unkv14] = data->sscanf("%-4c");
 			if (!sublevel->lvlname) sublevel->unkv14 = data->sscanf("%-4H" * sublevel->unkv14);
+			else if (sublevel->unkv14 == 60) {
+				//As of v1.2, this byte value has changed from 52 to 60, and there's more to parse out.
+				//No idea what any of this means.
+				sublevel->unkv14b = data->sscanf("%-4c%-4c%-4c%-4c%-4c");
+				[int n] = data->sscanf("%-4c");
+				sublevel->unkv14_shorts = data->sscanf("%-2c" * n);
+				sublevel->unkv14c = data->sscanf("%-4c%-4H");
+				//werror("Unkv14 %O %O %O %O\n", sublevel->unkv14, sublevel->unkv14b, sublevel->unkv14_shorts, sublevel->unkv14c);
+			}
 		}
 		[int collected] = data->sscanf("%-4c");
 		sublevel->collecteds = ({ });
