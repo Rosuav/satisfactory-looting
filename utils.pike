@@ -388,4 +388,9 @@ __async__ void cert_check() {
 void test() {
 	trace_on_signal();
 	//Add code as needed
+	object parser = G->bootstrap("modules/parser.pike");
+	function L10n = L10n_Satisfactory()->L10n;
+	mapping savefile = parser->low_parse_savefile("Bah Humbug_autosave_1.sav");
+	werror("\e[1m-- parsed old savefile, now reparsing newest --\e[0m\n");
+	savefile = parser->low_parse_savefile(0);
 }
