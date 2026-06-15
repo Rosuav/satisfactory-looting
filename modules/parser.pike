@@ -51,7 +51,8 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 	mapping ret = ([]);
 	//ret->_raw = ((string)data)[..sizeof(data) - end - 1]; ret->_path = path; //HACK
 	ret->_keyorder = ({ });
-	int log = G->G->show_first; G->G->show_first = 0;
+	//int log = G->G->show_first; G->G->show_first = 0;
+	int log = 0;
 	if (log) werror("parse_properties path %O raw %O\n", path, String.string2hex(((string)data)[..sizeof(data) - end - 1]) / 2 * " ");
 	while (sizeof(data) > end) {
 		[string prop] = data->sscanf("%-4H");
