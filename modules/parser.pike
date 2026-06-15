@@ -37,6 +37,15 @@ string read_string(Stdio.Buffer data) {
 	return utf8_to_string(data->read(len))[..<1];
 }
 
+mapping read_package(Stdio.Buffer data) {
+	mapping ret = ([]);
+	if (data->read_le_int(4)) {
+		ret->pkgname = read_string(data);
+		ret->extra = data->read_le_int(4);
+	}
+	return ret;
+}
+
 //Properties. If chain, expect more meaningful data after the None - otherwise, everything up to the end marker will be discarded.
 mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string path, int ver) {
 	mapping ret = ([]);
@@ -52,9 +61,24 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 		//if (prop == "mVisitedAreas\0") write("*** FOUND %O --> %O\n", path, prop);
 		[string type] = data->sscanf("%-4H");
 		mapping p = (["type": type - "\0"]);
+		if (ver >= 60) {
+			int mode = data->read_le_int(4);
+			if (mode) {
+				string type = read_string(data);
+				p->submode = data->read_le_int(4);
+				if (p->submode) {
+					p->subtype = read_string(data);
+					p->pkg = read_package(data);
+				}
+				if (mode == 2) {
+					werror("MODE 2! %O\n", String.string2hex(((string)data)[..sizeof(data) - end - 1]) / 2 * " ");
+					//Might need to read some more before going into the main handler
+				}
+			}
+		}
 		int sz = data->sscanf("%-4c")[0];
-		if (log) werror("parse_properties sz %O now %O\n", sz, String.string2hex(((string)data)[..sizeof(data) - end - 1]) / 2 * " ");
-		if (ver < 60) p->idx = data->sscanf("%-4c")[0]; //The index field seemed to disappear????
+		if (log) werror("parse_properties sz %O type %O now %O\n", sz, p->type, String.string2hex(((string)data)[..sizeof(data) - end - 1]) / 2 * " ");
+		if (ver < 60) p->idx = data->sscanf("%-4c")[0];
 		if (p->idx) {
 			//Currently the ONLY attribute that uses this is mLastSafeGroundPositions
 			//There are three such positions stored, and they're simply duplicated.
@@ -85,7 +109,8 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 			[p->value, int zero] = data->sscanf("%c%c");
 		} else if ((<"ArrayProperty\0", "SetProperty\0">)[type]) {
 			//Complex types have a single type
-			[p->subtype, int zero] = data->sscanf("%-4H%c");
+			if (ver < 60) [p->subtype] = data->sscanf("%-4H");
+			data->read(1);
 			//Empty array??? Unconfirmed. May have been only due to a prior bug.
 			if (p->subtype == "None\0") {write("None type in %O %O", type, path); data->read(sz); sz = 0; continue;}
 			p->subtype -= "\0";
@@ -746,7 +771,7 @@ void encode_properties(Stdio.Buffer _orig_dest, mapping props, int ver) {
 				case "BoolProperty": dest->sprintf("%c%c", p->value, 0); destruct(prop_size); break; //No size for these, leave it zero
 				case "ArrayProperty": case "SetProperty": {
 					//Complex types have a single type
-					dest->sprintf("%-4H%c%-4c", nt(p->subtype), 0, sizeof(p->value));
+					dest->sprintf("%-4H%s%-4c", nt(p->subtype), ver < 60 ? "\0" : "", sizeof(p->value));
 					prop_size->ref = sizeof(dest) - 4;
 					foreach (p->value; int i; mixed elem) switch (p->subtype) {
 						case "InterfaceProperty": //See above, is basically same as ObjectProperty
