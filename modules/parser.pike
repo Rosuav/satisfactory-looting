@@ -173,7 +173,8 @@ mapping parse_properties(Stdio.Buffer data, int end, int(1bit) chain, string pat
 			//if (sizeof(ret->_raw) < 2048) werror("Raw: %O\n", ret->_raw);
 		} else if (type == "StructProperty\0") {
 			//Struct types have more padding
-			[p->subtype, int zero] = data->sscanf("%-4H%17c");
+			if (ver < 60) [p->subtype, int zero] = data->sscanf("%-4H%17c");
+			else data->read(1);
 			p->subtype -= "\0";
 			end = sizeof(data) - sz;
 			switch (p->subtype) {
