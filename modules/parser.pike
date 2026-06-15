@@ -349,6 +349,7 @@ mapping parse_savefile_data(Stdio.Buffer data, mapping|void options) {
 		mapping sublevel = ([]); tree->sublevels += ({sublevel});
 		int pos = sizeof(decomp) - sizeof(data);
 		//The persistent level (one past the sublevel count) has no name field.
+		werror("Sublevel %O %O\n", sublevelcount, String.string2hex(((string)data)[..64]) / 2 * " ");
 		if (sublevelcount >= 0) sublevel->lvlname = data->sscanf("%-4H")[0];
 		[int sz, int count] = data->sscanf("%-8c%-4c");
 		int endpoint = sizeof(data) + 4 - sz; //The size includes the count, so adjust our position accordingly
@@ -389,15 +390,20 @@ mapping parse_savefile_data(Stdio.Buffer data, mapping|void options) {
 		[int entsz, int nument] = data->sscanf("%-8c%-4c");
 		endpoint = sizeof(data) + 4 - entsz;
 		//Note that nument ought to be the same as the object count (and therefore sizeof(objects)) from above
+		int log = endpoint == 0x1884c2;
+		if (log) werror("Remaining... %O\n", sizeof(data) - endpoint);
 		for (int i = 0; i < sizeof(objects) && i < nument; ++i) {
+			if (log) werror("[%d/%d] Next %O\n", i, sizeof(data) - endpoint, String.string2hex(((string)data)[..sizeof(data) - endpoint - 1]) / 2 * " ");
 			mapping obj = objects[i][-1];
 			[obj->ver, obj->flg, int sz] = data->sscanf("%-4c%-4c%-4c");
 			int propend = sizeof(data) - sz;
+			if (log) werror("[%d/%d] Prop sz %O\n", i, sizeof(data) - endpoint, sz);
 			int interesting = 0; //has_value(objects[i][1], "Char_Player");
 			if (interesting) write("INTERESTING: %O\n", objects[i]);
 			//if (!seen[objects[i][1]]) {write("OBJECT %O\n", (objects[i][1] / ".")[-1] - "\0"); seen[objects[i][1]] = 1;}
 			if (objects[i][0]) {
 				//Actor
+				if (log) werror("[%d/%d] Is actor %O\n", i, sizeof(data) - endpoint, String.string2hex(((string)data)[..64]) / 2 * " ");
 				[obj->parlvl, obj->parpath, int components] = data->sscanf("%-4H%-4H%-4c");
 				obj->components = ({ });
 				while (components--) obj->components += ({data->sscanf("%-4H%-4H")});
@@ -427,11 +433,14 @@ mapping parse_savefile_data(Stdio.Buffer data, mapping|void options) {
 				//Would it be worth identifying the biome that a radar tower is in? "Radar Tower (Grasslands)"
 			])[objects[i][1]])
 				ret->pois += ({({label, objects[i][9..11], prop})});
+			if (log) werror("[%d/%d] Done parse, %d left %O\n", i, sizeof(data) - endpoint, sizeof(data) - propend, String.string2hex(((string)data)[..sizeof(data) - propend - 1]) / 2 * " ");
+			if (obj->ver >= 60) data->read(4); //Extra \0\0\0\0 on newer files, unknown meaning
 		}
 		if (sizeof(data) > endpoint) sublevel->post_objects_bytes = data->read(sizeof(data) - endpoint);
 		//HYPOTHESIS: Save version 14 inserts another integer here. In the sublevels,
 		//it has unknown meaning, but in the persistent level, it's the number of...
 		//somethings. Of unknown meaning. But they're strings.
+		if (log) werror("Before collecteds %O\n", String.string2hex(((string)data)[..256]) / 2 * " ");
 		if (ver1 >= 14) {
 			[sublevel->unkv14] = data->sscanf("%-4c");
 			if (!sublevel->lvlname) sublevel->unkv14 = data->sscanf("%-4H" * sublevel->unkv14);
@@ -442,7 +451,14 @@ mapping parse_savefile_data(Stdio.Buffer data, mapping|void options) {
 				[int n] = data->sscanf("%-4c");
 				sublevel->unkv14_shorts = data->sscanf("%-2c" * n);
 				sublevel->unkv14c = data->sscanf("%-4c%-4H");
-				//werror("Unkv14 %O %O %O %O\n", sublevel->unkv14, sublevel->unkv14b, sublevel->unkv14_shorts, sublevel->unkv14c);
+				werror("Unkv14 %O %O %O %O\n", sublevel->unkv14, sublevel->unkv14b, sublevel->unkv14_shorts, sublevel->unkv14c);
+				werror("Next %O\n", String.string2hex(((string)data)[..16]) / 2 * " ");
+				//WEIRD HACK: How do we know whether there are collecteds or not????
+				//It seems that, when we have these version numbers, there's an array of versions after it
+				//But then there's no room for the array of collecteds!!
+				[int versions] = data->sscanf("%-4c");
+				while (versions--) data->sscanf("%16s%-4c"); //A UUID and a version number
+				sublevel->collecteds = ({ }); continue; //Ignore the collecteds for now.
 			}
 		}
 		[int collected] = data->sscanf("%-4c");
